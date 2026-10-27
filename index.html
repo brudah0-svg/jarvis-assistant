@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111f"><meta name="description" content="JARVIS, assistente personale sperimentale in italiano.">
+<link rel="manifest" href="./manifest.webmanifest"><link rel="stylesheet" href="./style.css">
+<title>JARVIS // Personal Assistant</title>
+</head>
+<body>
+<div class="grid-bg" aria-hidden="true"></div>
+<main class="app">
+<header class="topbar"><div class="mark"><i></i><i></i><i></i></div><div><p class="eyebrow">PERSONAL ASSISTANT SYSTEM</p><h1>J.A.R.V.I.S.</h1></div><div class="status"><i></i><span id="system-status">ONLINE LOCALE</span></div></header>
+<section class="hero panel"><div class="hero-copy"><p class="eyebrow">INTERFACCIA OPERATIVA // V0.1</p><h2>Buonasera.<br><em>Sistema pronto.</em></h2><p class="muted">Organizza le idee. Avvia un piano. Verifica i prossimi passi.</p></div><div class="reactor" aria-hidden="true"><div class="ring a"></div><div class="ring b"></div><div class="ring c"></div><div class="core">J</div></div><div class="hero-foot"><span class="pulse"></span><span id="assistant-state">IN ATTESA DI COMANDO</span><span class="mono">IT-IT</span></div></section>
+<section class="quick-actions"><button class="quick panel" data-command="Aiutami a pianificare un progetto"><span class="qicon">⌘</span><span><b>Pianifica</b><small>Trasforma un'idea in passi</small></span><span class="arrow">↗</span></button><button class="quick panel" data-command="Mostrami i comandi disponibili"><span class="qicon">⌁</span><span><b>Comandi</b><small>Scopri cosa posso fare</small></span><span class="arrow">↗</span></button><button class="quick panel" data-command="Esegui un controllo del sistema"><span class="qicon">◈</span><span><b>Diagnostica</b><small>Controlla le funzioni locali</small></span><span class="arrow">↗</span></button></section>
+<section class="panel workspace"><div class="section-head"><div><p class="eyebrow">CONSOLE</p><h2>Conversazione</h2></div><button id="clear-chat" class="text-button" type="button">Pulisci</button></div><div id="messages" class="messages" aria-live="polite"></div><form id="chat-form" class="composer"><label class="sr-only" for="message-input">Scrivi un messaggio a JARVIS</label><textarea id="message-input" rows="1" maxlength="1200" placeholder="Scrivi un comando..." autocomplete="off"></textarea><button id="mic-button" class="icon-button" type="button" aria-label="Avvia riconoscimento vocale" title="Parla">◉</button><button class="send-button" type="submit" aria-label="Invia messaggio">↑</button></form><p id="voice-note" class="footnote">La voce dipende dalla compatibilità del browser e dai permessi del microfono.</p></section>
+<section class="panel task-panel"><div class="section-head"><div><p class="eyebrow">MISSION CONTROL</p><h2>Attività locali</h2></div><span id="task-count" class="count">0</span></div><form id="task-form" class="task-form"><label class="sr-only" for="task-input">Nuova attività</label><input id="task-input" maxlength="160" placeholder="Aggiungi una prossima azione..."><button type="submit" class="add-button">+ Aggiungi</button></form><ul id="task-list" class="task-list"></ul><p class="footnote">Le attività restano in questo browser su questo dispositivo. Non sono sincronizzate.</p></section>
+<footer><span>JARVIS // PROTOTIPO LOCALE</span><span id="clock">--:--:--</span><span>BUILD 0.1.0</span></footer>
+</main><script src="./app.js" defer></script>
+</body></html>
