@@ -1,1 +1,0 @@
-JARVIS v0.1. Carica index.html nella root del repository GitHub, branch main. Poi Settings > Pages > Deploy from a branch > main > /(root) > Save. Prototipo statico: non è ancora collegato a un modello AI, non lavora in background e non esegue azioni esterne. I dati sono salvati nel browser.
