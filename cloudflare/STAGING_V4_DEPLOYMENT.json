@@ -6,7 +6,7 @@
   "source_chars": 326882,
   "built_from": [
     "cloudflare/workers/jarvis-staging.mjs",
-    "cloudflare/ui/command-v4.html",
+    "cloudflare/ui/command-v4-staging-snapshot.html",
     "scripts/build-v4-staging.mjs"
   ],
   "cloudflare_deployed_verified": true,
@@ -17,5 +17,6 @@
     "ai_binding": false,
     "production_database_binding": false,
     "rollback_version": "4ffb369b-3d07-4ed6-b6ca-28d38b4d37f5"
-  }
+  },
+  "source_note": "The staging HTML is frozen so production candidate UI can evolve without invalidating deployed staging source provenance."
 }
