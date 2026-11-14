@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node scripts/check-source.mjs && node scripts/check-provenance.mjs && node tests/backup-crypto.mjs && node tests/backup-worker-contract.mjs",
+    "test": "node scripts/check-source.mjs && node scripts/check-provenance.mjs && node tests/backup-crypto.mjs && node tests/backup-worker-contract.mjs && node tests/core-v3-contract.mjs",
     "check": "node scripts/check-source.mjs",
     "test:crypto": "node tests/backup-crypto.mjs",
     "test:backup-worker": "node tests/backup-worker-contract.mjs",
-    "check:provenance": "node scripts/check-provenance.mjs"
+    "check:provenance": "node scripts/check-provenance.mjs",
+    "test:core": "node tests/core-v3-contract.mjs"
   },
   "engines": {
     "node": ">=20"
