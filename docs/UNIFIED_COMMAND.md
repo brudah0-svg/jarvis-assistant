@@ -36,6 +36,12 @@ The approval queue is read-only; individual important operations still require t
 
 The Cloudflare service should preserve the following bindings and deployment controls when proposing any future release: production D1 `DB`, Worker AI `AI`, `STAGING_SERVICE`, `BACKUP_SERVICE`, `VERSION`, configured VAPID Worker secrets, and the existing Access authentication policy.
 
+## Cloud v4 reliability (candidate)
+
+The Cloud UI loads each dashboard section independently. If one API fails, the affected panel is marked unavailable and its write controls are disabled; successful panels remain usable. Missing data are not represented as empty zero-count records. AI chat history saves the user message before the assistant response and reports a partial save failure instead of claiming persistence.
+
+The staging HTML source is pinned in `cloudflare/ui/command-v4-staging-snapshot.html`. It reproduces the deployed private staging Worker for SHA-256 verification; changes to `cloudflare/ui/command-v4.html` do not automatically deploy to staging or production. `npm test` exercises synthetic outages and source parity. These tests do not substitute for a real authenticated Android session.
+
 ## Important limitations
 
 - This build is a **candidate**, not a deployed production release.
