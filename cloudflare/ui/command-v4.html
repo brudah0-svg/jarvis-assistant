@@ -124,7 +124,7 @@ button{color:#d0edff}
 const $=id=>document.getElementById(id);
 const STATIC_PREVIEW=/(^|\.)github\.io$/i.test(window.location.hostname);
 const LIVE_CLOUD_ORIGIN='https://jarvis-backend.jarvisproj3ct.workers.dev';
-const state={projects:[],tasks:[],memories:[],proposals:[],connected:false,loading:false};
+const state={projects:[],tasks:[],memories:[],proposals:[],connected:false,loading:false,availability:{projects:false,tasks:false,memories:false,proposals:false}};
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function notice(message,kind='status'){const el=$('cloudNotice');el.textContent=message;el.setAttribute('role',kind);$('connectionStatus').textContent=kind==='alert'?'ATTENZIONE':'CLOUD ONLINE';$('connectionStatus').className=kind==='alert'?'state-off':'state-ok'}
 function say(text,who='jarvis'){const box=document.createElement('div');box.className='bubble '+who;box.textContent=String(text);$('conversation').append(box);$('conversation').scrollTop=$('conversation').scrollHeight}
@@ -140,9 +140,9 @@ async function api(path,options={}){
 }
 function post(path,data){return api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})}
 function render(){
- $('projectCount').textContent=state.projects.filter(x=>x.status==='active').length;
- $('taskCount').textContent=state.tasks.filter(x=>x.status!=='done').length;
- $('approvalCount').textContent=state.proposals.filter(x=>x.status==='pending').length;
+ $('projectCount').textContent=state.availability.projects?state.projects.filter(x=>x.status==='active').length:'—';
+ $('taskCount').textContent=state.availability.tasks?state.tasks.filter(x=>x.status!=='done').length:'—';
+ $('approvalCount').textContent=state.availability.proposals?state.proposals.filter(x=>x.status==='pending').length:'—';
  const active=state.projects.filter(x=>x.status==='active');
  const selector=$('activeProject'),previous=selector.value;
  selector.replaceChildren();
@@ -150,17 +150,25 @@ function render(){
  for(const p of active){const opt=document.createElement('option');opt.value=p.id;opt.textContent=p.name;selector.append(opt)}
  if([...selector.options].some(x=>x.value===previous))selector.value=previous;
  $('projects').className='stack'+(active.length?'':' empty');
- $('projects').innerHTML=active.length?active.map(p=>'<div class="item"><div><strong>'+esc(p.name)+'</strong><small>'+esc(p.description||'Progetto attivo')+'</small></div><span class="tag">CLOUD</span></div>').join(''):'Nessun progetto cloud disponibile.';
+ $('projects').innerHTML=!state.availability.projects?'Impossibile caricare i progetti cloud. Riprova più tardi.':active.length?active.map(p=>'<div class="item"><div><strong>'+esc(p.name)+'</strong><small>'+esc(p.description||'Progetto attivo')+'</small></div><span class="tag">CLOUD</span></div>').join(''):'Nessun progetto cloud disponibile.';
  const filterProject=selector.value;const tasks=state.tasks.filter(x=>!filterProject||x.project_id===filterProject);
  $('tasks').className='stack'+(tasks.length?'':' empty');
- $('tasks').innerHTML=tasks.length?tasks.map(t=>'<div class="item"><div><strong>'+esc(t.title)+'</strong><small>'+esc(t.status==='done'?'Completata':t.status==='in_progress'?'In corso':'Da completare')+'</small></div><div class="item-actions"><button data-task-toggle="'+esc(t.id)+'">'+(t.status==='done'?'Riapri':'Completa')+'</button></div></div>').join(''):'Nessuna attività in questo filtro.';
+ $('tasks').innerHTML=!state.availability.tasks?'Attività cloud temporaneamente non disponibili.':tasks.length?tasks.map(t=>'<div class="item"><div><strong>'+esc(t.title)+'</strong><small>'+esc(t.status==='done'?'Completata':t.status==='in_progress'?'In corso':'Da completare')+'</small></div><div class="item-actions"><button data-task-toggle="'+esc(t.id)+'">'+(t.status==='done'?'Riapri':'Completa')+'</button></div></div>').join(''):'Nessuna attività in questo filtro.';
  const q=$('memorySearch').value.toLocaleLowerCase('it');
  const memories=state.memories.filter(m=>(m.content+' '+m.category).toLocaleLowerCase('it').includes(q));
  $('memories').className='stack'+(memories.length?'':' empty');
- $('memories').innerHTML=memories.length?memories.map(m=>'<div class="item"><div><strong>'+esc(m.content)+'</strong><div class="memory-meta">'+esc(m.category)+' · '+esc(m.created_at||'')+'</div></div><span class="tag">D1</span></div>').join(''):'Nessun ricordo cloud trovato.';
+ $('memories').innerHTML=!state.availability.memories?'Memoria cloud temporaneamente non disponibile.':memories.length?memories.map(m=>'<div class="item"><div><strong>'+esc(m.content)+'</strong><div class="memory-meta">'+esc(m.category)+' · '+esc(m.created_at||'')+'</div></div><span class="tag">D1</span></div>').join(''):'Nessun ricordo cloud trovato.';
+ $('addProject').disabled=!state.availability.projects;
+ $('addTask').disabled=!state.availability.tasks;
+ $('activeProject').disabled=!state.availability.projects;
+ $('memoryInput').disabled=!state.availability.memories;
+ $('memoryCategory').disabled=!state.availability.memories;
+ $('memoryForm').querySelector('button[type="submit"]').disabled=!state.availability.memories;
+ $('importMemory').disabled=!state.availability.memories;
+ $('exportMemory').disabled=!state.availability.memories;
  const pending=state.proposals.filter(x=>x.status==='pending');
  $('approvals').className='stack'+(pending.length?'':' empty');
- $('approvals').innerHTML=pending.length?pending.map(a=>'<div class="item"><div><strong>'+esc(a.title)+'</strong><small>In attesa di approvazione · '+esc(a.kind)+'</small></div><span class="tag">DA VALUTARE</span></div>').join(''):'Nessuna proposta cloud in attesa.';
+ $('approvals').innerHTML=!state.availability.proposals?'Non è possibile verificare le approvazioni in attesa.':pending.length?pending.map(a=>'<div class="item"><div><strong>'+esc(a.title)+'</strong><small>In attesa di approvazione · '+esc(a.kind)+'</small></div><span class="tag">DA VALUTARE</span></div>').join(''):'Nessuna proposta cloud in attesa.';
 }
 function enableStaticPreview(){
  $('previewModeInfo').hidden=false;
@@ -191,12 +199,26 @@ async function loadAll(){
  if(state.loading)return;
  state.loading=true;
  try{
-  const [projects,tasks,memories,proposals]=await Promise.all([
-   api('/api/projects'),api('/api/tasks'),api('/api/memory'),api('/api/proposals')
-  ]);
-  state.projects=projects.projects||[];state.tasks=tasks.tasks||[];state.memories=memories.memories||[];state.proposals=proposals.proposals||[];
-  state.connected=true;notice('Connesso · dati sincronizzati con Cloudflare');render();
- }catch(e){state.connected=false;notice('Connessione non disponibile: '+e.message,'alert');say('Non posso caricare i dati cloud. I dati locali nel vecchio sito non sono stati modificati.')}
+  const sections=[
+   ['projects','/api/projects'],['tasks','/api/tasks'],['memories','/api/memory'],['proposals','/api/proposals']
+  ];
+  const results=await Promise.allSettled(sections.map(([,path])=>api(path)));
+  const failed=[];
+  for(let i=0;i<sections.length;i++){
+   const key=sections[i][0],result=results[i];
+   if(result.status==='fulfilled'&&Array.isArray(result.value?.[key])){
+    state[key]=result.value[key];
+    state.availability[key]=true;
+   }else{
+    state.availability[key]=false;
+    failed.push(key);
+   }
+  }
+  state.connected=failed.length===0;
+  if(failed.length)notice('Sincronizzazione parziale: '+failed.join(', ')+'. I dati locali restano invariati.','alert');
+  else notice('Connesso · dati sincronizzati con Cloudflare');
+  render();
+ }catch(e){state.connected=false;notice('Connessione non disponibile: '+e.message,'alert')}
  finally{state.loading=false}
 }
 $('activeProject').onchange=render;
@@ -256,7 +278,11 @@ $('chatForm').onsubmit=async e=>{
   const answer=result.answer||'Il modello non ha restituito una risposta.';
   say(answer);
   // Chat persistence is explicit, after the user initiates a message.
-  await Promise.allSettled([post('/api/chat-history',{role:'user',content:message}),post('/api/chat-history',{role:'assistant',content:answer})]);
+  // Preserve chronological order and report any incomplete persistence.
+  try{
+   await post('/api/chat-history',{role:'user',content:message});
+   await post('/api/chat-history',{role:'assistant',content:answer});
+  }catch(historyError){say('La risposta AI è disponibile, ma lo storico non è stato salvato completamente: '+historyError.message)}
  }catch(err){say('AI non disponibile: '+err.message)}
  finally{submit.disabled=false}
 };
