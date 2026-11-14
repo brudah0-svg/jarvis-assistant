@@ -1,0 +1,22 @@
+{
+  "format": "jarvis-worker-source-provenance-v1",
+  "exported_at": "2026-11-14",
+  "note": "Exact Cloudflare Worker source snapshots, not a deployment authorization. Update hashes and recorded version IDs whenever source changes.",
+  "workers": {
+    "cloudflare/workers/jarvis-backend.mjs": {
+      "cloudflare_name": "jarvis-backend",
+      "version_id": "89f66668-175c-41ce-926c-b45aceef1f06",
+      "sha256": "15f9b6ca957c2999208efd65ce5918e9579bc7d6006faf2035410d796acfee17"
+    },
+    "cloudflare/workers/jarvis-staging.mjs": {
+      "cloudflare_name": "jarvis-staging",
+      "version_id": "4ffb369b-3d07-4ed6-b6ca-28d38b4d37f5",
+      "sha256": "cf690c4d617462adf32fcb1397b69415dd196fd5f6a48dde316449c752653185"
+    },
+    "cloudflare/workers/jarvis-backup-export.mjs": {
+      "cloudflare_name": "jarvis-backup-export",
+      "version_id": "9b917b6f-0f90-4258-b17e-45b70da58fed",
+      "sha256": "2431e8bbc364bc63dc9385f3cf4fba280eda1a5dfdbc21d34a514048e2b7c51f"
+    }
+  }
+}
