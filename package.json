@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node scripts/check-source.mjs",
-    "check": "node scripts/check-source.mjs"
+    "test": "node scripts/check-source.mjs && node tests/backup-crypto.mjs",
+    "check": "node scripts/check-source.mjs",
+    "test:crypto": "node tests/backup-crypto.mjs"
   },
   "engines": {
     "node": ">=20"
