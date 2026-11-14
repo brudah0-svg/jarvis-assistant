@@ -30,6 +30,7 @@ const ctx={
  $,document,Promise,STATIC_PREVIEW:false,
  state:{projects:[],tasks:[],memories:[],proposals:[],connected:false,loading:false,
         availability:{projects:false,tasks:false,memories:false,proposals:false}},
+ esc:text=>String(text??''),
  notice:(msg,kind)=>notices.push({msg,kind}),
  say:(...args)=>messages.push(args),
  api:async path=>{
