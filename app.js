@@ -35,9 +35,9 @@ $('addTask').onclick=()=>{const title=prompt('Descrivi l’attività:');if(title
 document.addEventListener('click',e=>{
  const d=e.target.dataset;
  if(d.memoryDelete!==undefined){if(confirm('Eliminare questo ricordo?')){memories.splice(+d.memoryDelete,1);save()}}
- if(d.project!==undefined){projects.splice(+d.project,1);save()}
+ if(d.project!==undefined){if(confirm('Eliminare questo progetto locale?')){projects.splice(+d.project,1);save()}}
  if(d.task!==undefined){tasks[+d.task].done=!tasks[+d.task].done;save()}
- if(d.taskDelete!==undefined){tasks.splice(+d.taskDelete,1);save()}
+ if(d.taskDelete!==undefined){if(confirm('Eliminare questa attività locale?')){tasks.splice(+d.taskDelete,1);save()}}
  if(d.approve!==undefined){const a=approvals.splice(+d.approve,1)[0];save();say('Approvazione registrata per: '+a.title+'. In questa versione è solo una registrazione, non viene eseguita alcuna azione esterna.')}
  if(d.reject!==undefined){const a=approvals.splice(+d.reject,1)[0];save();say('Richiesta rifiutata: '+a.title)}
 });
@@ -59,7 +59,7 @@ $('chatForm').onsubmit=e=>{e.preventDefault();const value=$('chatInput').value.t
    }
  }
  if(lower.startsWith('aggiungi progetto ')){const name=value.slice(18).trim();if(name){projects.push({name,note:'Aggiunto dalla chat'});save();say('Fatto: ho registrato il progetto '+name+'.') }else say('Scrivi: aggiungi progetto seguito dal nome.')}
- else if(lower.startsWith('aggiungi attività ')||lower.startsWith('aggiungi attivita ')){const title=value.slice(value.indexOf(' ')+1).trim();tasks.push({title,done:false});save();say('Attività registrata.')}
+ else if(lower.startsWith('aggiungi attività ')||lower.startsWith('aggiungi attivita ')){const title=value.replace(/^aggiungi attivit[àa] /i,'').trim();if(title){tasks.push({title,done:false});save();say('Attività registrata: '+title+'.')}else say('Scrivi un titolo dopo “aggiungi attività”.')}
  else if(lower.startsWith('proponi approvazione ')){const title=value.slice(21).trim();approvals.push({title,detail:'Proposta inserita manualmente; verifica prima di approvare.'});save();say('Ho inserito la proposta nella coda di approvazione. Non verrà eseguita alcuna azione esterna.')}
  else if(lower.startsWith('ricorda ')){const text=value.slice(8).trim();if(text){memories.unshift({text,category:'Altro',created:new Date().toISOString()});save();say('Ho salvato questo ricordo nella memoria locale.')}}
  else if(lower.includes('cosa ricordi')||lower.includes('mostra memoria'))say(memories.length?`Ho ${memories.length} ricordi salvati. Li trovi nell’Archivio di JARVIS.`:'La memoria è ancora vuota.')
@@ -67,4 +67,5 @@ $('chatForm').onsubmit=e=>{e.preventDefault();const value=$('chatInput').value.t
  else say('Per ora posso registrare elementi. Prova: “aggiungi progetto VoltaNido AI”, “aggiungi attività prepara portfolio” oppure “riepilogo”. Il collegamento a un modello AI arriverà in una fase successiva.');
 };
 $('voiceBtn').onclick=()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){say('La dettatura vocale non è supportata da questo browser. Puoi usare la tastiera.');return}const r=new SR();r.lang='it-IT';r.onresult=e=>{$('chatInput').value=e.results[0][0].transcript};r.onerror=()=>say('Non sono riuscito a ricevere la dettatura.');r.start()};
+$('exportAll').onclick=()=>{const data={format:'jarvis-local-data-v1',exportedAt:new Date().toISOString(),projects,tasks,approvals,memories,autoMemory};const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='jarvis-local-data-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);say('Backup completo dei dati locali esportato. Conserva il file in un posto sicuro: non è stato caricato sul cloud.');};
 function tick(){$('clock').textContent=new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}tick();setInterval(tick,30000);render();
