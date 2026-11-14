@@ -1,0 +1,28 @@
+name: JARVIS source safety
+on:
+  push:
+    branches:
+      - main
+      - "sync/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check worker syntax and safety invariants
+        run: npm test
+      - name: Check no private backup or local env files are tracked
+        run: |
+          if git ls-files | grep -Ei '(^|/)(\.dev\.vars|\.env(\.|$)|[^/]+\.(sqlite3?|db|pem|key|jarvisbak))$'; then
+            echo "Sensitive file type found in version control"
+            exit 1
+          fi

@@ -1,0 +1,28 @@
+# Copy this file outside the repo and replace placeholders before manual deployment.
+# No deployment is performed by CI.
+name = "jarvis-backend"
+main = "../workers/jarvis-backend.mjs"
+compatibility_date = "2026-11-13"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "jarvis-memory"
+database_id = "REPLACE_WITH_PRODUCTION_D1_ID"
+
+[[services]]
+binding = "STAGING_SERVICE"
+service = "jarvis-staging"
+
+[[services]]
+binding = "BACKUP_SERVICE"
+service = "jarvis-backup-export"
+
+[ai]
+binding = "AI"
+
+[version_metadata]
+binding = "VERSION"
+
+# Set VAPID_PRIVATE_JWK and VAPID_PUBLIC_KEY through Cloudflare secrets.
+# Check Cloudflare Access policy and routes before any deployment.

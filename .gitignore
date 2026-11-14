@@ -1,0 +1,26 @@
+# Never commit secrets, databases, credentials or user data
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+.wrangler/
+node_modules/
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-wal
+*.sql
+*.jarvisbak
+*.pem
+*.key
+*.p12
+*.pfx
+*.zip
+backup/
+backups/
+private/
+coverage/
+dist/
+.DS_Store

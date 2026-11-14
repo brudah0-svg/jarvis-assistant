@@ -1,0 +1,10 @@
+# Internal-only backup Worker; never enable workers_dev.
+name = "jarvis-backup-export"
+main = "../workers/jarvis-backup-export.mjs"
+compatibility_date = "2026-11-13"
+workers_dev = false
+
+[[d1_databases]]
+binding = "BACKUP_DB"
+database_name = "jarvis-project-backup"
+database_id = "REPLACE_WITH_BACKUP_D1_ID"
