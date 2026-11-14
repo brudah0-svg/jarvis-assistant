@@ -1,0 +1,21 @@
+{
+  "format": "jarvis-staging-v4-deployed-source-v1",
+  "worker": "jarvis-staging",
+  "version_id": "a43a3a07-4e54-4577-a775-3a11db96258e",
+  "source_sha256": "6efaf382b64c9d529d774f0c36c93b2234531116c5f9b3f1842fabc82071c274",
+  "source_chars": 326882,
+  "built_from": [
+    "cloudflare/workers/jarvis-staging.mjs",
+    "cloudflare/ui/command-v4.html",
+    "scripts/build-v4-staging.mjs"
+  ],
+  "cloudflare_deployed_verified": true,
+  "scope": "isolated staging only; no production deployment",
+  "security": {
+    "workers_dev": false,
+    "previews_enabled": false,
+    "ai_binding": false,
+    "production_database_binding": false,
+    "rollback_version": "4ffb369b-3d07-4ed6-b6ca-28d38b4d37f5"
+  }
+}

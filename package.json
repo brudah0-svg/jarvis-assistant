@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node scripts/check-source.mjs && node scripts/check-provenance.mjs && node tests/backup-crypto.mjs && node tests/backup-worker-contract.mjs && node tests/core-v3-contract.mjs && node tests/unified-command-v4.mjs && node tests/unified-command-contract.mjs && node tests/unified-preview-contract.mjs && node tests/v4-staging-contract.mjs && node tests/release-gate-v4-contract.mjs",
+    "test": "node scripts/check-source.mjs && node scripts/check-provenance.mjs && node tests/backup-crypto.mjs && node tests/backup-worker-contract.mjs && node tests/core-v3-contract.mjs && node tests/unified-command-v4.mjs && node tests/unified-command-contract.mjs && node tests/unified-preview-contract.mjs && node tests/v4-staging-contract.mjs && node tests/release-gate-v4-contract.mjs && node tests/staging-v4-source-parity.mjs",
     "check": "node scripts/check-source.mjs",
     "test:crypto": "node tests/backup-crypto.mjs",
     "test:backup-worker": "node tests/backup-worker-contract.mjs",
@@ -15,7 +15,8 @@
     "test:preview": "node tests/unified-preview-contract.mjs",
     "test:staging-v4": "node tests/v4-staging-contract.mjs",
     "build:staging-v4": "node scripts/build-v4-staging.mjs",
-    "test:release-gate": "node tests/release-gate-v4-contract.mjs"
+    "test:release-gate": "node tests/release-gate-v4-contract.mjs",
+    "test:stage-parity": "node tests/staging-v4-source-parity.mjs"
   },
   "engines": {
     "node": ">=20"

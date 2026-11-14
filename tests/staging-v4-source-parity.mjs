@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+
+const manifest=JSON.parse(readFileSync('cloudflare/STAGING_V4_DEPLOYMENT.json','utf8'));
+assert.equal(manifest.format,'jarvis-staging-v4-deployed-source-v1');
+assert.equal(manifest.worker,'jarvis-staging');
+assert.equal(manifest.security.workers_dev,false);
+assert.equal(manifest.security.previews_enabled,false);
+assert.equal(manifest.security.production_database_binding,false);
+assert.equal(manifest.security.ai_binding,false);
+execFileSync(process.execPath,['scripts/build-v4-staging.mjs'],{stdio:'inherit'});
+const src=readFileSync('dist/jarvis-v4-staging.mjs','utf8');
+const sha=createHash('sha256').update(src,'utf8').digest('hex');
+assert.equal(src.length,manifest.source_chars,'Built staging source differs in character count from verified Cloudflare code');
+assert.equal(sha,manifest.source_sha256,'Built staging source differs from deployed Cloudflare Worker bytes. Recheck before any release.');
+assert(src.includes('const STAGING_ONLY_MODE = true;'));
+assert(src.includes('Staging: endpoint not exposed'));
+console.log('Staging v4 source parity verified for Worker '+manifest.version_id+' at SHA-256 '+sha);
