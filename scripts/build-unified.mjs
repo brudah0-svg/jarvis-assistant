@@ -19,7 +19,7 @@ const anchor='const method = request.method;';
 assert.equal(worker.split(anchor).length,2,'Worker insertion point must be unique');
 assert(!worker.includes("if(path==='/command-v4'"),'Route already exists in source');
 
-const response = "if(path==='/command-v4' && method==='GET'){return new Response("+
+const response = "if(path==='/command-v4' && method==='GET'){if(origin && origin !== ALLOWED_ORIGIN && origin !== url.origin)return json({error:'Origin not allowed'},403);return new Response("+
   JSON.stringify(html)+
   ",{status:200,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'\"}})}";
 const output=worker.replace(anchor,anchor+'\n'+response);
