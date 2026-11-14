@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node scripts/check-source.mjs && node tests/backup-crypto.mjs",
+    "test": "node scripts/check-source.mjs && node tests/backup-crypto.mjs && node tests/backup-worker-contract.mjs",
     "check": "node scripts/check-source.mjs",
-    "test:crypto": "node tests/backup-crypto.mjs"
+    "test:crypto": "node tests/backup-crypto.mjs",
+    "test:backup-worker": "node tests/backup-worker-contract.mjs"
   },
   "engines": {
     "node": ">=20"
