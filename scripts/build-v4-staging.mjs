@@ -2,7 +2,7 @@ import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import assert from 'node:assert/strict';
 
 const stage=readFileSync('cloudflare/workers/jarvis-staging.mjs','utf8');
-let html=readFileSync('cloudflare/ui/command-v4.html','utf8');
+let html=readFileSync('cloudflare/ui/command-v4-staging-snapshot.html','utf8');
 assert(stage.includes('const STAGING_ONLY_MODE = true;'));
 assert(stage.includes("Staging: endpoint not exposed"));
 assert(stage.includes("path === '/staging-check'"));

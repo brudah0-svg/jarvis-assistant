@@ -12,7 +12,7 @@
 
 - **Current private staging Worker deployment:** `a43a3a07-4e54-4577-a775-3a11db96258e`.
 - **Previous recoverable staging Worker version:** `4ffb369b-3d07-4ed6-b6ca-28d38b4d37f5` (the source snapshot pinned above).
-- **Build inputs:** `scripts/build-v4-staging.mjs` and `cloudflare/ui/command-v4.html`. The existing staging source snapshot is kept immutable so the build reproduces the candidate safely.
+- **Build inputs:** `scripts/build-v4-staging.mjs` and pinned `cloudflare/ui/command-v4-staging-snapshot.html`. The existing staging source snapshot is kept immutable so the build reproduces the candidate safely.
 - **Deployed candidate:** 326,882 characters; guarded `/command-v4` view, synthetic memory/proposal reads, regression fixture routes retained. No live Workers AI binding.
 - **Cloudflare verification:** staging `workers.dev` and preview URL both disabled; only staging D1 `DB` and `VERSION` bindings present; staging D1 quick check is `ok` and 1 project/1 task fixtures unchanged.
 - **GitHub CI:** v4 staging synthetic contract passed for UI, read-only APIs, blocked writes and absent privileged endpoints. This is **not** a remote HTTP/browser test of the running staging Worker.
