@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const s=readFileSync('cloudflare/ui/command-v4.html','utf8');
+assert.match(s,/^<!doctype html>/i);
+assert(!s.includes("<style>500;600;700;800&display=swap');"),'Malformed stylesheet prefix must not recur');
+assert(s.includes('body{background-color:#050b14!important;color:#e8f4ff!important}'),'Dark background must be explicit');
+assert(s.includes('STATIC_PREVIEW'),'GitHub Pages preview must be detected');
+assert(s.includes('enableStaticPreview()'),'Preview guard must disable live operations');
+assert(s.includes("if(STATIC_PREVIEW)throw Error("),'Static preview must not call cloud APIs');
+assert(s.includes("if(STATIC_PREVIEW){enableStaticPreview();return}"),'No cloud data fetch on static Pages');
+assert(s.includes('Da questo dominio non è possibile utilizzare le API Cloudflare protette'),'Preview must state its limits');
+assert(!s.includes('localStorage.'),'Legacy phone data must not be accessed');
+assert(s.includes('LIVE_CLOUD_ORIGIN'),'Provide link to existing protected Cloudflare app');
+assert(s.includes("input.disabled=true"),'Preview must disable data-changing controls');
+assert(s.includes("chatSubmit.disabled=true"),'Preview must disable chatbot submission');
+console.log('JARVIS v4 preview checks passed: dark theme, static-origin guard, no cloud requests, retained local storage.');
