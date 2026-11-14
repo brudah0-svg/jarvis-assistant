@@ -1,0 +1,13 @@
+# Staging: isolated DB, NO production services, NO public route.
+name = "jarvis-staging"
+main = "../workers/jarvis-staging.mjs"
+compatibility_date = "2026-11-13"
+workers_dev = false
+
+[[d1_databases]]
+binding = "DB"
+database_name = "jarvis-staging"
+database_id = "REPLACE_WITH_STAGING_D1_ID"
+
+[version_metadata]
+binding = "VERSION"
