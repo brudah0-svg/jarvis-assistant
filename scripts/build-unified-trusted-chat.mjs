@@ -18,7 +18,7 @@ const oldRead=`const [memory,projects,tasks]=await Promise.all([
           env.DB.prepare("SELECT name,description,status FROM projects ORDER BY created_at DESC LIMIT 12").all(),
           env.DB.prepare("SELECT title,status FROM tasks ORDER BY created_at DESC LIMIT 15").all()
         ]);
-        const context=JSON.stringify({memories:memory.results,projects:projects.results,tasks:tasks.results}).slice(0,9000);`;
+        const context=JSON.stringify({memories:memory.results,projects:projects.results,tasks:tasks.results}).slice(0,5500);`;
 const newRead=`const [memory,projects,tasks,approvals,history,siteJobs,siteDrafts,multiProjects]=await Promise.all([
           env.DB.prepare("SELECT content,category FROM memories ORDER BY created_at DESC LIMIT 12").all(),
           env.DB.prepare("SELECT name,description,status FROM projects ORDER BY created_at DESC LIMIT 12").all(),
@@ -35,7 +35,7 @@ const newRead=`const [memory,projects,tasks,approvals,history,siteJobs,siteDraft
         if(recentTurns.length&&recentTurns.at(-1).role==='user'&&recentTurns.at(-1).content===body.message.trim().slice(0,450))recentTurns.pop();
         const previousConversation=recentTurns.slice(-8);
         const verifiedSites={recent_jobs:(siteJobs.results||[]).map(j=>({title:j.title||null,brief:j.brief,status:j.status,updated_at:j.updated_at})),saved_drafts:(siteDrafts.results||[]).map(d=>({title:d.title,brief:d.brief,created_at:d.created_at})),multipage_projects:(multiProjects.results||[]).map(p=>({title:p.title,brief:p.brief,created_at:p.created_at}))};
-        const context=JSON.stringify({memories:memory.results,projects:projects.results,tasks:tasks.results,verified_site_state:verifiedSites,verified_approval_state:{pending_proposals:pendingProposals,chat_is_read_only:true,approved_by_chat:false,executed_by_chat:false}}).slice(0,5500);`;
+        const context=JSON.stringify({memories:memory.results,projects:projects.results,tasks:tasks.results,verified_site_state:verifiedSites,verified_approval_state:{pending_proposals:pendingProposals,chat_is_read_only:true,approved_by_chat:false,executed_by_chat:false}}).slice(0,9000);`;
 assert.equal(candidate.split(oldRead).length,2);
 candidate=candidate.replace(oldRead,newRead);
 const oldLine='const system="Sei JARVIS, assistente personale italiano.';
