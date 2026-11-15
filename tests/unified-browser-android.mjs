@@ -84,6 +84,7 @@ try{
  assert.equal(response.status(),200);
  await page.waitForFunction(()=>document.querySelector('#projectCount')?.textContent==='1',{timeout:15000});
  assert.equal(await page.locator('#taskCount').textContent(),'1');
+ assert.match(await page.locator('#aiApprovalNotice').textContent(),/Centro approvazioni/);
  assert.match(await page.locator('#cloudNotice').textContent(),/Connesso/);
  const advanced=await page.locator('a.module').evaluateAll(links=>links.map(a=>({href:a.getAttribute('href'),url:a.href})));
  assert(advanced.length>=6);
