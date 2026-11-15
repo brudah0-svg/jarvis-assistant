@@ -476,6 +476,24 @@ function parseJarvisCoreCommand(message){
  const website=input.match(/^(?:(?:puoi|potresti)\s+)?(?:crea|creami|costruisci|costruiscimi|realizza|fammi|sviluppa|preparami)\s+(?:(?:un|il)\s+)?(?:sito\s*(?:web)?|landing\s*page)\s*(?:per\s+|[:\-]\s*|di\s+)(.+)$/i)
   ||input.match(/^vorrei\s+che\s+mi\s+(?:creassi|facessi)\s+(?:(?:un|il)\s+)?(?:sito\s*(?:web)?|landing\s*page)\s+per\s+(.+)$/i);
  if(website)return {kind:'website',title:website[1].trim()};
+
+ // Android speech recognition may fragment "mi crei un sito" as "micr è un sito un sito".
+ // This fallback is intentionally constrained: an imperative-like start, a website noun,
+ // and an explicit "per <recipient>" are ALL required. Informational questions stay read-only.
+ const noisyPrefix=input.match(/^(?:(?:per favore|perfavore)\s+)?(?:(?:puoi|potresti)\s+)?(?:mi\s*cre(?:i|a|eresti|i\s+)|mi\s*cr[eè]?\s*(?:è|e)?\s*|micr\s*(?:è|e)?\s*|crea(?:mi)?|costruisci(?:mi)?|fammi|fai|realizza|sviluppa|preparami|vorrei\s+(?:un|il)\s+sito)\b[\s,:;-]*/i);
+ if(noisyPrefix){
+  const rest=input.slice(noisyPrefix[0].length).trim();
+  const site=rest.match(/^(?:(?:un|il)\s+)?(?:sito(?:\s+web)?|sito\s+(?:un\s+)?sito(?:\s+web)?|pagina\s+web|landing\s+page)(?:\s+(?:un\s+)?sito(?:\s+web)?)?\s+(?:per|di)\s+(.+)$/i);
+  if(site){
+   const target=site[1].replace(/\s+(?:per\s+favore|perfavore|grazie|per\s+piacere)[.!?]*$/i,'').replace(/[.!?]+$/,'').trim();
+   if(target.length>=3&&target.length<=850)return {kind:'website',title:target};
+  }
+ }
+ // If the transcription clearly asks to build a website but omits a coherent
+ // recipient, ask for a better brief rather than inventing a completed action.
+ const wantsWebsite=/^(?:mi\s*cre|micr\b|crea(?:mi)?\b|costruisci(?:mi)?\b|fammi\b|realizza\b|sviluppa\b)/i.test(input)&&/\b(?:sito|pagina\s+web|landing\s+page)\b/i.test(input);
+ if(wantsWebsite)return {kind:'website-clarify'};
+
  if(/^(?:(?:mostra(?:mi)?|elenca|controlla)\s+)?(?:i\s+)?(?:miei\s+)?(?:lavori|incarichi)(?:\s+(?:dei\s+)?siti)?[.!?]?$/i.test(input)
    ||/^(?:a\s+che\s+punto\s+sono\s+)?(?:i\s+)?(?:miei\s+)?(?:siti\s+in\s+lavorazione)[.!?]?$/i.test(input))
    return {kind:'site-status'};
@@ -550,6 +568,7 @@ function showMultipageProjectInChat(project){
  wrapper.append(toolbar,iframe);$('conversation').append(wrapper);$('conversation').scrollTop=$('conversation').scrollHeight;
 }
 async function runJarvisCoreCommand(command){
+ if(command.kind==='website-clarify')return 'Ho capito che vuoi creare un sito, ma la dettatura non è abbastanza chiara. Dimmi per chi deve essere il sito, ad esempio «Jarvis, creami un sito web per un idraulico». Nessun lavoro è stato avviato.';
  if(command.kind==='project-clarify')return 'Posso creare un progetto nel Cloud, ma mi serve un nome preciso. Prova: «Jarvis, mi crei un progetto per il sito di un elettricista». Non ho creato nulla.';
 
  if(command.kind==='multi-open'){
