@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 // Reuse the exact deployed staging source, but do not mutate its version manifest or hash.
 execFileSync(process.execPath,['scripts/build-v4-ui-next.mjs'],{stdio:'inherit'});
 const source=readFileSync('dist/jarvis-v4-ui-next.mjs','utf8');
-const pinned=JSON.parse(readFileSync('cloudflare/STAGING_V4_DEPLOYMENT.json','utf8'));
+const pinned=JSON.parse(readFileSync('cloudflare/STAGING_V4_DEPLOYMENT_UI_PREV.json','utf8'));
 const hash=text=>createHash('sha256').update(text,'utf8').digest('hex');
 assert.equal(hash(source),pinned.source_sha256,'Original deployed source must remain reproducible');
 const begin='const STAGING_V4_HTML=',end=';\nconst STAGING_V4_HEADERS=';
