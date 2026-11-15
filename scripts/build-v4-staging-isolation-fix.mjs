@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+execFileSync(process.execPath,['scripts/build-v4-ui-hardened.mjs'],{stdio:'inherit'});
+const source=readFileSync('dist/jarvis-v4-ui-hardened.mjs','utf8');
+const deployment=JSON.parse(readFileSync('cloudflare/STAGING_V4_DEPLOYMENT.json','utf8'));
+const sha=s=>createHash('sha256').update(s).digest('hex');
+assert.equal(sha(source),deployment.source_sha256,'Baseline must match exactly deployed staging Worker');
+const marker='const STAGING_ONLY_MODE = true;';
+assert.equal(source.split(marker).length,2,'Staging guard must be unique');
+const guard="if(STAGING_ONLY_MODE&&method==='POST'&&path==='/api/tasks'&&!request.headers.get('content-type'))return json({error:'Staging writes restricted'},404,'');";
+const next=source.replace(marker,marker+'\n'+guard);
+assert.equal(next.split(guard).length,2);
+assert(next.includes("if(method==='PATCH')return json({error:'Staging: endpoint not exposed'},404,'');"));
+writeFileSync('dist/jarvis-v4-staging-isolation-fix.mjs',next);
+console.log('Staging-only HTTP 502 verification fix candidate '+sha(next)+' — no deployment.');
