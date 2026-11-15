@@ -3,9 +3,9 @@ import {execFileSync} from 'node:child_process';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
-execFileSync(process.execPath,['scripts/build-v4-ui-hardened.mjs'],{stdio:'inherit'});
-execFileSync(process.execPath,['--check','dist/jarvis-v4-ui-hardened.mjs'],{stdio:'inherit'});
-const worker=(await import(pathToFileURL(resolve('dist/jarvis-v4-ui-hardened.mjs')).href)).default;
+execFileSync(process.execPath,['scripts/build-v4-staging-isolation-fix.mjs'],{stdio:'inherit'});
+execFileSync(process.execPath,['--check','dist/jarvis-v4-staging-isolation-fix.mjs'],{stdio:'inherit'});
+const worker=(await import(pathToFileURL(resolve('dist/jarvis-v4-staging-isolation-fix.mjs')).href)).default;
 const database={prepare(sql){return {bind(){return this},async all(){
  if(sql.startsWith('SELECT id,name,description,status,created_at,updated_at FROM projects'))return {results:[{id:'staging-project',name:'Synthetic project',status:'active'}]};
  if(sql.startsWith('SELECT * FROM tasks'))return {results:[{id:'staging-task',project_id:'staging-project',status:'pending'}]};
