@@ -644,7 +644,7 @@ $('siteJobsList').onclick=async event=>{
    $('siteJobsStatus').textContent='Sito completato e salvato. Anteprima disponibile; nessuna pubblicazione esterna.';
   }
  }catch(error){$('siteJobsStatus').textContent='Operazione interrotta: '+error.message+'. Aggiorna i lavori per verificare lo stato.'}
- finally{siteJobsBusy=false;button.disabled=false;await loadSiteJobs()}
+ finally{const finishedMessage=$('siteJobsStatus').textContent;siteJobsBusy=false;button.disabled=false;await loadSiteJobs();if(finishedMessage.includes('Sito completato e salvato')||finishedMessage.includes('Lavoro completato: sito riaperto'))$('siteJobsStatus').textContent=finishedMessage}
 };
 
 async function loadSiteDrafts(){
