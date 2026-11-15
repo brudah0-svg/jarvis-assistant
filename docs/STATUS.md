@@ -120,6 +120,13 @@
 - A `main` push trigger was added because the GitHub-managed Pages workflow had not emitted the previous expected workflow-run trigger. The check retries publication with bounded delays and reports a failure instead of accepting a mismatch.
 - This does not complete the latest backup's isolated restore, an additional off-device copy, physical Android acceptance, or the current staging version's remote 10/10 regression; production release remains **blocked**.
 
+## Off-device encrypted backup — user confirmation (2026-11-15)
+
+- The user explicitly confirms that a **second copy of the encrypted backup has been saved**, following the Android off-device backup instructions. This updates the previously missing *human confirmation of off-device storage*.
+- A prior local Android verification showed a decryptable `.jarvisbak` with 35 tables and 96 records; the separate second copy has **not** been re-downloaded or independently decrypted/hashed here. Its exact byte identity, availability and storage-provider durability remain unverified. No backup, password, location, or secret has been uploaded to GitHub or transmitted to this assistant.
+- Do not set `independent_backup_verified=1` on Cloudflare solely from this human report. Preserve the difference between user attestation and technical verification, and require the latest snapshot's **actual isolated restore drill** before the production gate can open.
+- Current-version remote 10/10, physical authenticated Android acceptance, source provenance and explicit production approval remain independent requirements.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
