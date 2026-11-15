@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 
 execFileSync(process.execPath,['scripts/build-v4-staging.mjs'],{stdio:'inherit'});
 const baseline=readFileSync('dist/jarvis-v4-staging.mjs','utf8');
-const deployed=JSON.parse(readFileSync('cloudflare/STAGING_V4_DEPLOYMENT.json','utf8'));
+const deployed=JSON.parse(readFileSync('cloudflare/STAGING_V4_DEPLOYMENT_PREV.json','utf8'));
 const sha=s=>createHash('sha256').update(s,'utf8').digest('hex');
 assert.equal(sha(baseline),deployed.source_sha256,'Pinned v4 staging baseline must match deployed version');
 const old="if(path.startsWith('/api/')&&method!=='GET'&&path!=='/api/projects'&&path!=='/api/tasks')return json({error:'Staging: scrittura non consentita'},405,'');";
