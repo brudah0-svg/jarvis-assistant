@@ -8,8 +8,11 @@ import {mkdirSync} from 'node:fs';
 import {chromium} from 'playwright';
 
 // Chromium with Android-like touch/viewport, not physical Android or remote staging.
-execFileSync(process.execPath,['scripts/build-v4-ui-next.mjs'],{stdio:'inherit'});
-const worker=(await import(pathToFileURL(resolve('dist/jarvis-v4-ui-next.mjs')).href)).default;
+const hardened=process.env.JARVIS_STAGE_HARDENED==='1';
+const script=hardened?'scripts/build-v4-ui-hardened.mjs':'scripts/build-v4-ui-next.mjs';
+const filename=hardened?'dist/jarvis-v4-ui-hardened.mjs':'dist/jarvis-v4-ui-next.mjs';
+execFileSync(process.execPath,[script],{stdio:'inherit'});
+const worker=(await import(pathToFileURL(resolve(filename)).href)).default;
 const syntheticDB={prepare(sql){return{bind(){return this},async all(){
  if(sql.startsWith('SELECT id,name,description,status,created_at,updated_at FROM projects'))return {results:[{id:'staging-project',name:'Progetto dimostrativo',description:'Dati sintetici',status:'active'}]};
  if(sql.startsWith('SELECT * FROM tasks'))return {results:[{id:'staging-task',project_id:'staging-project',title:'Attività dimostrativa',status:'pending'}]};
@@ -64,6 +67,15 @@ try{
  assert.equal(await page.locator('#memoryInput').isDisabled(),true);
  assert.equal(await page.locator('#memoryForm button[type="submit"]').isDisabled(),true);
  assert.equal(await page.locator('#chatForm button[type="submit"]').isDisabled(),true);
+ if(hardened){
+  const taskToggle=page.locator('#tasks [data-task-toggle]').first();
+  assert.equal(await taskToggle.count(),1,'Synthetic project must show an actionable task');
+  assert.equal(await taskToggle.isDisabled(),true,'Read-only staging task toggle must be disabled');
+  const links=await page.locator('a.module').evaluateAll(els=>els.map(a=>({href:a.getAttribute('href'),disabled:a.getAttribute('aria-disabled')})));
+  assert(links.length>0,'Expected module links');
+  assert(links.every(a=>a.href===null&&a.disabled==='true'),'Staging must not link to live production modules');
+  await taskToggle.dispatchEvent('click');
+ }
  assert.match(await page.locator('body').textContent(),/STAGING ISOLATO/);
 
  for(const width of [360,393,412]){
@@ -80,7 +92,7 @@ try{
  for(const route of ['/api/projects','/api/tasks','/api/memory','/api/proposals','/api/chat-history']){
   assert(stats.get.some(x=>x.startsWith(route)),'Missing browser GET route '+route);
  }
- console.log('Mobile Chromium smoke passed: synthetic dashboard, Android-like viewport/touch, no overflow, blocked controls, five data reads, zero live API calls, zero writes.');
+ console.log('Mobile Chromium smoke passed ('+(hardened?'hardened candidate':'current pinned staging')+'): synthetic dashboard, Android-like viewport/touch, no overflow, blocked controls, five data reads, zero live API calls, zero writes.');
  await context.close();
 }finally{
  if(browser)await browser.close();

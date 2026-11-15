@@ -26,6 +26,10 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Exercise v4 UI in Android-like Chromium
         run: node tests/mobile-browser-smoke.mjs
+      - name: Check hardened read-only candidate in Android-like Chromium
+        env:
+          JARVIS_STAGE_HARDENED: '1'
+        run: node tests/mobile-browser-smoke.mjs
       - name: Attach synthetic UI screenshot
         if: always()
         uses: actions/upload-artifact@v4
