@@ -98,6 +98,18 @@ try{
  browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  const context=await browser.newContext({viewport:{width:393,height:852},isMobile:true,hasTouch:true,deviceScaleFactor:3,colorScheme:'dark',locale:'it-IT',reducedMotion:'reduce'});
  const page=await context.newPage();
+ await page.addInitScript(()=>{
+  window.__jarvisSpoken=[];
+  window.SpeechSynthesisUtterance=class {constructor(text){this.text=text}};
+  Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{
+   cancel(){},
+   speak(utterance){window.__jarvisSpoken.push(utterance.text)}
+  }});
+  window.SpeechRecognition=class {
+   start(){queueMicrotask(()=>this.onresult?.({results:[[{transcript:'Puoi spiegarmi cosa fai, Jarvis?'}]]}))}
+  };
+ });
+
  const jsErrors=[],dialogs=[];
  page.on('pageerror',e=>jsErrors.push(String(e)));
  page.on('request',request=>{
@@ -250,6 +262,16 @@ try{
  assert.equal(await page.locator('#siteDownload').isEnabled(),true);
  assert((await page.locator('#sitePreview').getAttribute('srcdoc')).includes('Sito generato e salvato'));
  assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0);
+
+ // Tap-to-talk: a recognized Italian phrase submits to the existing AI path;
+ // only then does JARVIS speak the server-supplied reply.
+ await page.locator('#voiceBtn').click();
+ await page.waitForFunction(()=>window.__jarvisSpoken?.some(x=>x.includes('Risposta sintetica')),{timeout:15000});
+ assert.equal(await page.locator('#voiceOutputBtn').getAttribute('aria-pressed'),'true');
+ const voiceCalls=writes.filter(w=>w.path==='/api/ai-chat'&&w.body.message==='Puoi spiegarmi cosa fai, Jarvis?');
+ assert.equal(voiceCalls.length,1,'Speech recognition must submit recognized text exactly once');
+ await page.locator('#voiceOutputBtn').click();
+ assert.equal(await page.locator('#voiceOutputBtn').getAttribute('aria-pressed'),'false');
 
  assert.deepEqual(jsErrors,[],'No unhandled JS errors');
  assert.deepEqual(externalNetwork,[],'No external domains were contacted');

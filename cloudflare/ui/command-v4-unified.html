@@ -184,8 +184,8 @@ button{color:#d0edff}
         <article class="panel wide assistant">
           <div class="panel-head"><div><p class="eyebrow">INTERFACCIA</p><h2>Parla con JARVIS</h2></div><span class="tag">AI CLOUD</span></div>
           <div id="conversation" class="conversation"><div class="bubble jarvis">Sì, signore. Sono collegato al centro di comando Cloud. Le operazioni importanti richiedono la tua approvazione.</div></div>
-          <form id="chatForm" class="chat-form"><input id="chatInput" autocomplete="off" placeholder="Scrivi un comando o una nota…" aria-label="Messaggio per JARVIS"><button class="send" type="submit">INVIA</button><button id="voiceBtn" class="voice" type="button" title="Dettatura vocale">🎙</button></form>
-          <p class="hint" id="aiApprovalNotice">Comandi: «Crea progetto: Nome», «Aggiungi attività: Titolo» e «Pianifica: Obiettivo» (con conferma prima della scrittura). La chat AI può proporre piani, ma non può dichiararli approvati: verifica sempre le richieste nel Centro approvazioni. Nessun acquisto, invio o modifica viene eseguito dalla sola risposta della chat. La dettatura dipende dal browser Android.</p>
+          <form id="chatForm" class="chat-form"><input id="chatInput" autocomplete="off" placeholder="Scrivi un comando o una nota…" aria-label="Messaggio per JARVIS"><button class="send" type="submit">INVIA</button><button id="voiceBtn" class="voice" type="button" title="Dettatura vocale">🎙</button><button id="voiceOutputBtn" class="voice" type="button" aria-pressed="false" title="Attiva le risposte vocali">🔇 Voce OFF</button></form>
+          <p class="hint" id="aiApprovalNotice">Comandi: «Crea progetto: Nome», «Aggiungi attività: Titolo» e «Pianifica: Obiettivo» (con conferma prima della scrittura). La chat AI può proporre piani, ma non può dichiararli approvati: verifica sempre le richieste nel Centro approvazioni. Nessun acquisto, invio o modifica viene eseguito dalla sola risposta della chat. La conversazione vocale richiede il tocco sul microfono e un browser Android compatibile; non è ancora un assistente a schermo spento.</p>
         </article>
       </section>
       <footer>JARVIS v4 · Cloud Command Center · Azioni importanti soggette ad approvazione</footer>
@@ -198,7 +198,29 @@ const LIVE_CLOUD_ORIGIN='https://jarvis-backend.jarvisproj3ct.workers.dev';
 const state={projects:[],tasks:[],memories:[],proposals:[],connected:false,loading:false,availability:{projects:false,tasks:false,memories:false,proposals:false}};
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function notice(message,kind='status'){const el=$('cloudNotice');el.textContent=message;el.setAttribute('role',kind);$('connectionStatus').textContent=kind==='alert'?'ATTENZIONE':'CLOUD ONLINE';$('connectionStatus').className=kind==='alert'?'state-off':'state-ok'}
-function say(text,who='jarvis'){const box=document.createElement('div');box.className='bubble '+who;box.textContent=String(text);$('conversation').append(box);$('conversation').scrollTop=$('conversation').scrollHeight}
+let voiceOutputEnabled=false;
+function jarvisSpeak(message){
+ if(!voiceOutputEnabled||!('speechSynthesis' in window)||typeof SpeechSynthesisUtterance==='undefined')return;
+ try{
+  window.speechSynthesis.cancel();
+  const speech=new SpeechSynthesisUtterance(String(message).slice(0,950));
+  speech.lang='it-IT';speech.rate=0.96;speech.pitch=0.88;
+  window.speechSynthesis.speak(speech);
+ }catch(error){$('voiceOutputBtn').textContent='🔇 Voce non disponibile';voiceOutputEnabled=false}
+}
+function say(text,who='jarvis'){
+ const box=document.createElement('div');box.className='bubble '+who;
+ box.textContent=String(text);$('conversation').append(box);$('conversation').scrollTop=$('conversation').scrollHeight;
+ if(who==='jarvis'&&chatBusy)jarvisSpeak(text);
+}
+$('voiceOutputBtn').onclick=()=>{
+ if(!('speechSynthesis' in window)){say('Risposta vocale non supportata su questo browser.');return}
+ voiceOutputEnabled=!voiceOutputEnabled;
+ $('voiceOutputBtn').setAttribute('aria-pressed',String(voiceOutputEnabled));
+ $('voiceOutputBtn').textContent=voiceOutputEnabled?'🔊 Voce ON':'🔇 Voce OFF';
+ if(voiceOutputEnabled)jarvisSpeak('Sì, signore. Risposta vocale attivata.');
+ else window.speechSynthesis.cancel();
+};
 async function api(path,options={}){
  if(STATIC_PREVIEW)throw Error('Anteprima statica: API Cloudflare disponibili solo dal dominio autenticato.');
  if(!path.startsWith('/api/'))throw Error('Percorso non consentito');
@@ -451,10 +473,11 @@ $('chatForm').onsubmit=async e=>{
   }catch(err){say('AI non disponibile: '+err.message+' (il messaggio utente è stato salvato).')}
  }finally{chatBusy=false;submit.disabled=false}
 };
-$('voiceBtn').onclick=()=>{
+$('voiceBtn').onclick=()=>{if(!voiceOutputEnabled&&'speechSynthesis' in window){voiceOutputEnabled=true;$('voiceOutputBtn').textContent='🔊 Voce ON';$('voiceOutputBtn').setAttribute('aria-pressed','true')}
+
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){say('Dettatura non supportata dal browser. Usa la tastiera Android.');return}
- const recognition=new SR();recognition.lang='it-IT';recognition.onresult=e=>{const spoken=e.results[0][0].transcript;$('chatInput').value=spoken;if(parseJarvisCoreCommand(spoken)?.kind==='website'){$('chatForm').requestSubmit()}};recognition.onerror=()=>say('Errore della dettatura.');recognition.start();
+ const recognition=new SR();recognition.lang='it-IT';recognition.onresult=e=>{const spoken=e.results[0][0].transcript;$('chatInput').value=spoken;if(spoken.trim()){$('chatForm').requestSubmit()}};recognition.onerror=()=>say('Errore della dettatura.');recognition.start();
 };
 
 // User-initiated import, never a background or cross-origin localStorage read.
@@ -546,6 +569,7 @@ async function generateSiteFromBrief(brief){
   $('siteDownload').disabled=false;
   status.textContent='Sito generato, anteprima pronta. '+(result.saved?'Bozza salvata nel Cloud.':result.saveError?'ATTENZIONE: '+result.saveError:'Non salvato nel Cloud.')+' Puoi scaricare il file HTML. Nessuna pubblicazione effettuata.';
   if(result.saved)await loadSiteDrafts();
+  if(!chatBusy)jarvisSpeak('Signore, il sito è pronto. Può vedere l’anteprima e scaricarlo.');
   return 'Ho generato il sito «'+lastGeneratedSite.name+'» e mostrato l’anteprima. Puoi scaricarlo dal Website Builder. Non è stato pubblicato.';
  }finally{siteGenerating=false;$('siteGenerate').disabled=false}
 }
