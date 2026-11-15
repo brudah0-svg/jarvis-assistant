@@ -192,6 +192,15 @@
 - Source evidence: `cloudflare/UNIFIED_ANDROID_UI_ROLLFORWARD_2026-11-15.json`.
 - **Limits**: actual Android post-fix screenshots not yet independently checked; AI chat generated text is not proof of plan approval/execution; no claim that all future agent autonomy features are complete. Verify those independently before certification.
 
+## Verified approval-aware AI chat — production online (2026-11-15)
+
+- PR #41 added server-side read-only lookup of pending action proposals, explicit no-execution and no-chat-approval response metadata, and a separate trusted client status. A failed approval-state lookup blocks inference. PR #42 added independent synthetic CI validation of the actual Worker route (run `43724337478`, passed).
+- Deployed the tested code-only production candidate to `jarvis-backend` as version `a768f5bf-ab08-47dc-9876-03bddf9dc042`, SHA-256 `28c3520c93eb636d220ba4ffda76706c1d277aa3b087a467a355ddd080271bf8`. Cloudflare source was read back and verified after deployment.
+- Previous version `e346679f-6295-441b-bf4e-1c6848891d97` retained. Cloudflare Access, all seven bindings, original and unified routes preserved.
+- Production D1 remains intact (`quick_check=ok`, 2 projects, 20 tasks, 0 pending proposals); staging unchanged.
+- This verifies an improved truthfulness boundary, **not** complete autonomous capability or a post-update physical Android functional test.
+- See [UNIFIED_AI_CHAT_TRUTH_RELEASE_2026-11-15.md](UNIFIED_AI_CHAT_TRUTH_RELEASE_2026-11-15.md).
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
