@@ -55,7 +55,7 @@ const server=createServer(async(req,res)=>{
    const memory={id:'created-memory-'+(++counter),content:body.content,category:body.category,created_at:'2026-11-15'};
    memories.push(memory);return json(res,201,{status:'created',memory});
   }
-  if(path==='/api/site-builder'&&req.method==='POST')return json(res,200,{status:'generated',format:'standalone-static-html',html:'<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Pinco Pallo</title></head><body><h1>Pinco Pallo - Sito creato</h1><p>Impianti elettrici</p></body></html>',siteTitle:'Pinco Pallo',requires_publication_approval:true,production_deployed:false,operations_executed:false});
+  if(path==='/api/site-builder'&&req.method==='POST')return json(res,200,{status:'generated',format:'standalone-static-html',html:'<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Pinco Pallo</title></head><body><h1>Pinco Pallo - Sito creato</h1><p>Impianti elettrici</p>'+('<section><p>Testi di prova per il collaudo mobile del sito. Nessun dato personale o esterno.</p></section>'.repeat(8))+'</body></html>',siteTitle:'Pinco Pallo',requires_publication_approval:true,production_deployed:false,operations_executed:false});
   if(path==='/api/plan'&&req.method==='POST')return json(res,200,{status:'proposal',goal:body.goal,steps:[{order:1,title:'Preparare il prototipo'},{order:2,title:'Collaudare su Android'}],requires_approval:true,notice:'Bozza sintetica senza scritture'});
   if(path==='/api/chat-history'&&req.method==='POST')return json(res,201,{status:'created'});
   if(path==='/api/ai-chat'&&req.method==='POST')return json(res,200,{answer:'Risposta sintetica, nessuna AI reale utilizzata.'});
@@ -183,11 +183,10 @@ try{
  assert.equal(await page.locator('#sitePreview').isHidden(),false);
  assert((await page.locator('#sitePreview').getAttribute('srcdoc')).includes('Pinco Pallo - Sito creato'));
  assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0,'No publishing or external operations');
- const downloads=[];
- page.on('download',d=>downloads.push(d.suggestedFilename()));
+ const downloadPromise=page.waitForEvent('download',{timeout:10000});
  await page.locator('#siteDownload').click();
- await page.waitForFunction(()=>true);
- assert(downloads.includes('sito-jarvis.html'),'Standalone site must download');
+ const download=await downloadPromise;
+ assert.equal(download.suggestedFilename(),'sito-jarvis.html','Standalone site must download');
  const builderAfter=writes.filter(w=>w.path==='/api/site-builder').length;
  await page.locator('#chatInput').fill('Crea un sito web per Pinco Pallo elettricista in Veneto');
  await page.locator('#chatForm button[type=submit]').click();
