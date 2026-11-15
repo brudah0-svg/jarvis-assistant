@@ -177,6 +177,7 @@ button{color:#d0edff}
           </form>
           <p class="hint" id="siteBuilderStatus" role="status" aria-live="polite">JARVIS prepara una pagina HTML completa, visualizzabile offline. La pubblicazione richiede un'autorizzazione separata.</p>
           <iframe id="sitePreview" title="Anteprima isolata del sito generato" sandbox="" referrerpolicy="no-referrer" loading="lazy" hidden></iframe>
+          <div class="site-drafts-panel" id="siteJobsPanel"><div class="panel-head"><h3>Lavori JARVIS · riprendibili</h3><button type="button" class="small-btn" id="siteJobsRefresh">Aggiorna lavori</button></div><p class="hint">Salva un incarico e premi Avvia. Se chiudi la pagina puoi ritrovarlo qui. La costruzione richiede l'avvio esplicito e non pubblica siti.</p><div class="site-builder-actions"><button type="button" id="siteJobCreate" class="small-btn">Aggiungi incarico alla coda</button></div><p class="hint" id="siteJobsStatus" role="status" aria-live="polite">Caricamento lavori…</p><div id="siteJobsList" class="stack" aria-label="Incarichi Website Builder"></div></div>
           <div class="site-drafts-panel"><div class="panel-head"><h3>Bozze salvate</h3><button id="siteRefreshDrafts" type="button" class="small-btn">Aggiorna bozze</button></div><p class="hint" id="siteDraftsStatus" role="status" aria-live="polite">Caricamento bozze private…</p><div id="siteDraftsList" class="stack" aria-label="Le tue bozze salvate"></div></div>
           <p class="hint">Anteprima isolata, senza esecuzione di JavaScript, connessioni esterne o pubblicazione automatica. Rivedi testi e contatti prima di utilizzare il risultato.</p>
         </article>
@@ -569,6 +570,83 @@ $('siteVoice').onclick=()=>{
 };
 
 
+
+// Persistent, recoverable site jobs. No autonomous background process is claimed:
+// "Avvia" makes one authenticated request and the result remains in D1.
+let siteJobsBusy=false;
+async function loadSiteJobs(){
+ const status=$('siteJobsStatus'),list=$('siteJobsList');
+ if(STATIC_PREVIEW){status.textContent='Disponibile soltanto sul JARVIS Cloud autenticato.';return}
+ try{
+  const result=await api('/api/site-jobs');
+  if(result.status!=='ok'||!Array.isArray(result.jobs))throw Error('Risposta non valida');
+  list.replaceChildren();
+  for(const job of result.jobs){
+   if(!job||typeof job.id!=='string'||typeof job.brief!=='string')continue;
+   const box=document.createElement('div');box.className='item';
+   const info=document.createElement('div');
+   const strong=document.createElement('strong');strong.textContent=job.brief.slice(0,90);
+   const small=document.createElement('small');small.textContent='Stato: '+job.status+' · Tentativi: '+job.attempt_count+'/3'+(job.error_text?' · '+job.error_text:'');
+   info.append(strong,small);box.append(info);
+   const button=document.createElement('button');
+   button.className='small-btn';button.type='button';button.dataset.jobId=job.id;
+   button.textContent=job.status==='completed'?'Apri sito':job.status==='running'?'In esecuzione':job.attempt_count>=3?'Tentativi esauriti':'Avvia';
+   button.disabled=job.status==='running'||(job.status!=='completed'&&job.attempt_count>=3);
+   box.append(button);list.append(box);
+  }
+  status.textContent=result.jobs.length?'Lavori recuperati: '+result.jobs.length+'. I lavori non vengono eseguiti in background.':'Non ci sono incarichi salvati.';
+ }catch(error){status.textContent='Impossibile caricare i lavori: '+error.message}
+}
+async function openSiteJob(job){
+ const response=await api('/api/site-drafts/'+encodeURIComponent(job.draft_id||job.id));
+ const draft=response.draft;
+ if(response.status!=='ok'||!draft||typeof draft.html!=='string'||draft.html.length>70000)throw Error('Sito generato non recuperabile');
+ lastGeneratedSite={html:draft.html,name:draft.title||'sito-jarvis'};
+ $('sitePreview').srcdoc=draft.html;
+ $('sitePreview').hidden=false;
+ $('siteDownload').disabled=false;
+ $('siteBrief').value=String(draft.brief||'').slice(0,1200);
+ $('siteBuilderStatus').textContent='Sito recuperato dall’incarico JARVIS. Scarica il file o esamina l’anteprima. Non pubblicato.';
+ document.getElementById('websiteBuilderPanel').scrollIntoView({behavior:'smooth',block:'start'});
+}
+$('siteJobCreate').onclick=async()=>{
+ if(siteJobsBusy)return;
+ const brief=$('siteBrief').value.trim(),email=$('siteEmail').value.trim();
+ if(brief.length<15||brief.length>1200){$('siteJobsStatus').textContent='Descrivi il sito in 15-1200 caratteri.';return}
+ if(email&&!$('siteEmail').checkValidity()){$('siteJobsStatus').textContent='Indirizzo email non valido.';return}
+ siteJobsBusy=true;$('siteJobCreate').disabled=true;
+ try{
+  const r=await post('/api/site-jobs',{brief,style:$('siteStyle').value,contactEmail:email});
+  if(r.status!=='queued'||typeof r.job?.id!=='string')throw Error('Il server non ha confermato il lavoro');
+  $('siteJobsStatus').textContent='Lavoro salvato nel Cloud. Premi Avvia quando vuoi generare il sito.';
+  await loadSiteJobs();
+ }catch(error){$('siteJobsStatus').textContent='Lavoro non aggiunto: '+error.message}
+ finally{siteJobsBusy=false;$('siteJobCreate').disabled=false}
+};
+$('siteJobsRefresh').onclick=()=>loadSiteJobs();
+$('siteJobsList').onclick=async event=>{
+ const button=event.target.closest('button[data-job-id]');if(!button||siteJobsBusy)return;
+ const jobId=button.dataset.jobId;if(!/^[0-9a-f-]{36}$/i.test(jobId))return;
+ siteJobsBusy=true;button.disabled=true;
+ try{
+  const status=await api('/api/site-jobs/'+encodeURIComponent(jobId));
+  const job=status.job;
+  if(status.status!=='ok'||!job)throw Error('Lavoro non disponibile');
+  if(job.status==='completed'){
+   await openSiteJob(job);$('siteJobsStatus').textContent='Lavoro completato: sito riaperto dal Cloud.';
+  }else{
+   if(job.status==='running')throw Error('Lavoro già in esecuzione. Aggiorna la lista.');
+   if(job.attempt_count>=3)throw Error('Tre tentativi esauriti. Crea un nuovo lavoro.');
+   $('siteJobsStatus').textContent='JARVIS sta generando il sito. Puoi recuperare il risultato dalla coda…';
+   const run=await post('/api/site-jobs/'+encodeURIComponent(jobId)+'/run',{});
+   if(run.status!=='completed')throw Error('Nessuna conferma di completamento');
+   await openSiteJob(run.job);
+   $('siteJobsStatus').textContent='Sito completato e salvato. Anteprima disponibile; nessuna pubblicazione esterna.';
+  }
+ }catch(error){$('siteJobsStatus').textContent='Operazione interrotta: '+error.message+'. Aggiorna i lavori per verificare lo stato.'}
+ finally{const finishedMessage=$('siteJobsStatus').textContent;siteJobsBusy=false;button.disabled=false;await loadSiteJobs();if(finishedMessage.includes('Sito completato e salvato')||finishedMessage.includes('Lavoro completato: sito riaperto'))$('siteJobsStatus').textContent=finishedMessage}
+};
+
 async function loadSiteDrafts(){
  const list=$('siteDraftsList'),status=$('siteDraftsStatus');
  if(STATIC_PREVIEW){status.textContent='Archivio disponibile solo nella versione Cloud autenticata.';return}
@@ -614,6 +692,6 @@ $('siteDraftsList').onclick=async event=>{
 };
 
 function tick(){$('clock').textContent=new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}
-tick();setInterval(tick,30000);loadAll();loadChatHistory();loadSiteDrafts();</script>
+tick();setInterval(tick,30000);loadAll();loadChatHistory();loadSiteDrafts();loadSiteJobs();</script>
 </body>
 </html>

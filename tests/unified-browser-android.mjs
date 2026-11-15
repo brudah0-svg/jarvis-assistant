@@ -16,6 +16,7 @@ const tasks=[{id:'task-base',project_id:'cloud-base',title:'Attività Cloud',sta
 const memories=[{id:'memory-base',content:'Memoria Cloud',category:'Altro',created_at:'2026-11-15'}];
 const proposals=[];
 const savedDrafts=[];
+const siteJobs=[];
 const requests=[],writes=[];
 let counter=0,externalNetwork=[];
 const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}).end(JSON.stringify(data))};
@@ -30,6 +31,8 @@ const server=createServer(async(req,res)=>{
   if(!path.startsWith('/api/')){res.writeHead(404).end('Not Found');return}
   requests.push({path,method:req.method});
   if(req.method==='GET'){
+   if(path==='/api/site-jobs')return json(res,200,{status:'ok',jobs:siteJobs});
+   if(path.startsWith('/api/site-jobs/')){const found=siteJobs.find(j=>j.id===path.split('/').pop());return json(res,found?200:404,found?{status:'ok',job:found}:{error:'Not found'});}
    if(path==='/api/site-drafts')return json(res,200,{status:'ok',drafts:savedDrafts.map(({id,title,brief,style,created_at})=>({id,title,brief,style,created_at}))});
    if(path.startsWith('/api/site-drafts/')){const found=savedDrafts.find(x=>x.id===path.split('/').pop());return json(res,found?200:404,found?{status:'ok',draft:found}:{error:'Not found'});}
    if(path==='/api/projects')return json(res,200,{projects});
@@ -57,6 +60,20 @@ const server=createServer(async(req,res)=>{
   if(path==='/api/memory'&&req.method==='POST'){
    const memory={id:'created-memory-'+(++counter),content:body.content,category:body.category,created_at:'2026-11-15'};
    memories.push(memory);return json(res,201,{status:'created',memory});
+  }
+  if(path==='/api/site-jobs'&&req.method==='POST'){
+    const id='00000000-0000-4000-8000-'+String(++counter).padStart(12,'0');
+    const job={id,brief:body.brief,style:body.style,contact_email:body.contactEmail||'',status:'queued',attempt_count:0,draft_id:null,created_at:'2026-11-15 16:40:00'};
+    siteJobs.push(job);return json(res,201,{status:'queued',job,external_publication:false});
+  }
+  if(path.startsWith('/api/site-jobs/')&&path.endsWith('/run')&&req.method==='POST'){
+    const id=path.split('/')[3];const job=siteJobs.find(j=>j.id===id);
+    if(!job)return json(res,404,{error:'Not found'});
+    if(job.status==='completed')return json(res,200,{status:'completed',job,already_completed:true});
+    job.status='completed';job.attempt_count++;job.draft_id=id;
+    const html='<!doctype html><html><head><meta charset="utf-8"><title>Generated</title></head><body><h1>Sito generato e salvato</h1></body></html>';
+    savedDrafts.push({id,title:'Sito completato',brief:job.brief,style:job.style,contact_email:job.contact_email,html,created_at:'2026-11-15 16:40:00'});
+    return json(res,200,{status:'completed',job,external_publication:false,requires_publication_approval:true});
   }
   if(path==='/api/site-builder'&&req.method==='POST'){
     const html='<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Pinco Pallo</title></head><body><h1>Pinco Pallo - Sito creato</h1><p>Impianti elettrici</p>'+('<section><p>Testi di prova per il collaudo mobile del sito. Nessun dato personale o esterno.</p></section>'.repeat(8))+'</body></html>';
@@ -214,6 +231,25 @@ try{
  assert.equal(savedDrafts.length,2,'Website command also saves the draft in private Cloud');
  assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0,'Saved drafts must not publish a site');
 
+
+ // Durable job: queue and run, then reload Android browser and recover the same completed site.
+ await page.locator('#siteBrief').fill('Realizza un sito moderno per Pinco Pallo, manutenzione e domotica per famiglie.');
+ await page.locator('#siteJobCreate').click();
+ await page.waitForFunction(()=>document.querySelector('#siteJobsList button[data-job-id]'),{timeout:15000});
+ assert.equal(siteJobs.length,1);
+ assert.equal(siteJobs[0].status,'queued');
+ await page.locator('#siteJobsList button[data-job-id]').click();
+ await page.waitForFunction(()=>document.querySelector('#siteJobsStatus')?.textContent?.includes('Sito completato e salvato'),{timeout:15000});
+ assert.equal(siteJobs[0].status,'completed');
+ assert.equal(savedDrafts.length,3);
+ assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0);
+ await page.reload({waitUntil:'networkidle'});
+ await page.waitForFunction(()=>document.querySelector('#siteJobsList button[data-job-id]')?.textContent==='Apri sito',{timeout:15000});
+ await page.locator('#siteJobsList button[data-job-id]').click();
+ await page.waitForFunction(()=>document.querySelector('#siteBuilderStatus')?.textContent?.includes('Sito recuperato dall’incarico'),{timeout:15000});
+ assert.equal(await page.locator('#siteDownload').isEnabled(),true);
+ assert((await page.locator('#sitePreview').getAttribute('srcdoc')).includes('Sito generato e salvato'));
+ assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0);
 
  assert.deepEqual(jsErrors,[],'No unhandled JS errors');
  assert.deepEqual(externalNetwork,[],'No external domains were contacted');
