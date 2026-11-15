@@ -165,6 +165,15 @@
 - The old cloud audit flag `restore_test_verified=0` was deliberately not changed; the newly executed test is recorded here as an independent proof. Prior encrypted off-device Android copy was for the earlier 96-row snapshot, **not verified for the new 101-row snapshot**.
 - Full functional authenticated Android app acceptance and explicit release approval remain necessary. Keep production release gate **blocked**; do not treat this audit as permission to publish.
 
+## Unified one-origin JARVIS — synthetic Android browser acceptance (2026-11-15)
+
+- PR #35 merged: built a **build-only**, version-pinned Cloudflare candidate `/jarvis-unified`, with dashboard, chat, memory, projects, tasks and same-origin advanced module links. The existing live production Worker was **not** updated.
+- The candidate includes a user-consented additive import of `jarvis-local-data-v1` exported from old GitHub Pages. It leaves original Android localStorage in place, skips duplicate project/task/memory names and does not execute or migrate queued approvals.
+- PR #36 merged after **successful GitHub Actions Chromium Android-like browser acceptance** run `43718783379`. The test exercised app load at mobile viewport widths 360/393/412, shared-origin modules and manifest, synthetic AI chat, cancellation without writes, confirmed migration, correct open-task counts, completed task preservation, deduplication upon second import, no transferred approvals, zero external network requests and zero unhandled JavaScript errors.
+- Browser run used synthetic data and no Cloudflare Access login, real backups, production D1 writes or production Worker deployment. A synthetic screenshot is attached to that GitHub Actions run.
+- **Not ready to mark released:** need physical authenticated Android acceptance for the unified Cloud route, verify the current 101-row encrypted off-device backup, complete security/release-candidate review, and obtain **explicit production deployment approval**. The build-only URL `/jarvis-unified` is not yet publicly routed on Cloudflare.
+- Keep both existing GitHub Pages app and existing Cloudflare production routes available until the data migration has been verified by the user. Do not automatically redirect or delete the local app.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
