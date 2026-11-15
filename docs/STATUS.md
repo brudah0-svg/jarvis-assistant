@@ -127,6 +127,16 @@
 - Do not set `independent_backup_verified=1` on Cloudflare solely from this human report. Preserve the difference between user attestation and technical verification, and require the latest snapshot's **actual isolated restore drill** before the production gate can open.
 - Current-version remote 10/10, physical authenticated Android acceptance, source provenance and explicit production approval remain independent requirements.
 
+## Latest application snapshot — isolated SQL restore proven (2026-11-15)
+
+- Completed real temporary Cloudflare D1 reconstruction of latest snapshot `2a1e5a8c-7a27-43d7-acd3-2411eddfbf02` (**35 application tables and 96 records**), not a synthetic restore.
+- Recomputed archived schema/data SHA-256 digests, restored all tables and rows into an EU-jurisdiction temporary D1, and verified `PRAGMA quick_check = ok`, zero foreign-key violations, identical table lists and identical read-back row contents.
+- Deleted temporary database and independently verified that the Cloudflare account returned to its original four databases. Production and staging deployments were unchanged.
+- Full execution report: [LATEST_BACKUP_RESTORE_DRILL_2026-11-15.md](LATEST_BACKUP_RESTORE_DRILL_2026-11-15.md).
+- **Important:** archived `restore_test_verified` metadata flag remains 0 because no production/backup audit flags were changed by this isolated test. The historical statements below about the flag describe the state before this new independent test.
+- User confirmed a second saved encrypted backup copy outside the phone; exact byte parity of that separate copy is still unverified.
+- Release still blocked pending fresh remote 10/10 on current staging, authenticated physical Android acceptance, review of release candidate provenance and explicit production approval.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
