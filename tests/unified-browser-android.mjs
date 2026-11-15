@@ -122,13 +122,22 @@ try{
  const page=await context.newPage();
  await page.addInitScript(()=>{
   window.__jarvisSpoken=[];
+  window.__jarvisAutoRecognition=true;
+  window.__jarvisRecognitionInstances=[];
   window.SpeechSynthesisUtterance=class {constructor(text){this.text=text}};
   Object.defineProperty(window,'speechSynthesis',{configurable:true,value:{
    cancel(){},
-   speak(utterance){window.__jarvisSpoken.push(utterance.text)}
+   speak(utterance){
+    window.__jarvisSpoken.push(utterance.text);
+    if(window.__jarvisAutoRecognition===false)setTimeout(()=>utterance.onend?.(),25);
+   }
   }});
   window.SpeechRecognition=class {
-   start(){queueMicrotask(()=>this.onresult?.({results:[[{transcript:'Puoi spiegarmi cosa fai, Jarvis?'}]]}))}
+   start(){
+    window.__jarvisRecognitionInstances.push(this);
+    if(window.__jarvisAutoRecognition)queueMicrotask(()=>this.onresult?.({results:[[{transcript:'Puoi spiegarmi cosa fai, Jarvis?'}]]}));
+   }
+   abort(){this.onend?.()}
   };
  });
 
@@ -339,6 +348,33 @@ try{
  assert.equal(voiceCalls.length,1,'Speech recognition must submit recognized text exactly once');
  await page.locator('#voiceOutputBtn').click();
  assert.equal(await page.locator('#voiceOutputBtn').getAttribute('aria-pressed'),'false');
+
+ // Voice dialogue: one button press, two independent recognized turns, automatic resumption.
+ await page.evaluate(()=>{window.__jarvisAutoRecognition=false});
+ await page.locator('#dialogueBtn').click();
+ assert.equal(await page.locator('#dialogueBtn').getAttribute('aria-pressed'),'true');
+ await page.waitForFunction(()=>window.__jarvisRecognitionInstances?.length>=2,{timeout:15000});
+ const chatCallsBefore=writes.filter(w=>w.path==='/api/ai-chat').length;
+ await page.evaluate(()=>{
+  const rec=window.__jarvisRecognitionInstances.at(-1);
+  rec.onresult?.({results:[[{transcript:'Puoi spiegarmi cosa fai, Jarvis?'}]]});
+ });
+ await page.waitForFunction(()=>window.__jarvisSpoken?.filter(x=>x.includes('Risposta sintetica')).length>=2,{timeout:15000});
+ await page.waitForFunction(()=>window.__jarvisRecognitionInstances?.length>=3,{timeout:15000});
+ assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,chatCallsBefore+1,'Voice transcript should be submitted once');
+ const multiBefore=writes.filter(w=>w.path==='/api/site-projects').length;
+ await page.evaluate(()=>{
+  const rec=window.__jarvisRecognitionInstances.at(-1);
+  rec.onresult?.({results:[[{transcript:'Hey Jarvis, creami un sito multipagina per Officina Demo'}]]});
+ });
+ await page.waitForFunction(()=>window.__jarvisSpoken?.some(x=>x.includes('Ho creato il sito multipagina')),{timeout:15000});
+ await page.waitForFunction(()=>window.__jarvisRecognitionInstances?.length>=4,{timeout:15000});
+ assert.equal(writes.filter(w=>w.path==='/api/site-projects').length,multiBefore+1,'Voice creates project without a builder click');
+ const priorWrites=writes.length;
+ await page.locator('#dialogueBtn').click();
+ assert.equal(await page.locator('#dialogueBtn').getAttribute('aria-pressed'),'false');
+ assert.equal(writes.length,priorWrites,'Stopping must not write');
+ assert.match(await page.locator('#dialogueStatus').textContent(),/terminato/i);
 
  assert.deepEqual(jsErrors,[],'No unhandled JS errors');
  assert.deepEqual(externalNetwork,[],'No external domains were contacted');

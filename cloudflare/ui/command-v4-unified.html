@@ -93,6 +93,13 @@ button{color:#d0edff}
 .site-drafts-panel h3{font-size:16px;margin:0}.site-drafts-panel .item{align-items:center;gap:12px}
 .site-drafts-panel .item button{min-height:40px;font-size:12px}
 @media(max-width:680px){.site-drafts-panel{padding:12px}}
+
+/* Conversation-first: one JARVIS panel before the secondary tools. */
+.grid>.assistant{order:-1;grid-column:1/-1;border-color:#276b90;box-shadow:0 0 24px #178bc019}
+.assistant .conversation{min-height:215px;max-height:min(54vh,560px);overflow-y:auto}
+#dialogueBtn[aria-pressed="true"]{background:#155d76;color:#e9faff;box-shadow:0 0 0 1px #53c7f5}
+#dialogueStatus{min-height:20px;margin:10px 0 0;font-size:12px;color:#95d6f6;line-height:1.5}
+@media(max-width:680px){.assistant .conversation{min-height:190px;max-height:48vh}.assistant .chat-form{flex-wrap:wrap}#dialogueBtn{flex:1 0 100%;min-height:45px}}
 </style>
   <title>JARVIS · Centro di comando unificato</title>
   <link rel="manifest" href="/jarvis-app.webmanifest">
@@ -166,7 +173,7 @@ button{color:#d0edff}
         <article class="panel wide" id="websiteBuilderPanel">
           <div class="panel-head"><div><p class="eyebrow">AGENTE OPERATIVO · WEBSITE BUILDER</p><h2>Crea un sito con JARVIS</h2></div><span class="tag">AI · ANTEPRIMA PRIVATA</span></div>
           <form id="siteBuilderForm" class="site-builder-form">
-            <label for="siteBrief">Descrivi il sito che desideri</label>
+            <label for="siteBrief">Website Builder manuale · per dare ordini a JARVIS usa la conversazione principale qui sopra</label>
             <textarea id="siteBrief" maxlength="1200" minlength="15" required placeholder="Crea un sito elegante per Pinco Pallo, elettricista a Verona. Servizi: impianti elettrici, domotica, manutenzione..."></textarea>
             <div class="site-builder-settings">
               <label for="siteStyle">Stile <select id="siteStyle"><option value="notte">Scuro elegante</option><option value="chiaro">Chiaro professionale</option><option value="energia">Energia</option></select></label>
@@ -182,10 +189,10 @@ button{color:#d0edff}
           <p class="hint">Anteprima isolata, senza esecuzione di JavaScript, connessioni esterne o pubblicazione automatica. Rivedi testi e contatti prima di utilizzare il risultato.</p>
         </article>
         <article class="panel wide assistant">
-          <div class="panel-head"><div><p class="eyebrow">INTERFACCIA</p><h2>Parla con JARVIS</h2></div><span class="tag">AI CLOUD</span></div>
+          <div class="panel-head"><div><p class="eyebrow">JARVIS · INTERFACCIA PRINCIPALE</p><h2>Parla con JARVIS</h2></div><span class="tag">UNICA CONVERSAZIONE</span></div>
           <div id="conversation" class="conversation"><div class="bubble jarvis">Sì, signore. Sono collegato al centro di comando Cloud. Le operazioni importanti richiedono la tua approvazione.</div></div>
-          <form id="chatForm" class="chat-form"><input id="chatInput" autocomplete="off" placeholder="Scrivi un comando o una nota…" aria-label="Messaggio per JARVIS"><button class="send" type="submit">INVIA</button><button id="voiceBtn" class="voice" type="button" title="Dettatura vocale">🎙</button><button id="voiceOutputBtn" class="voice" type="button" aria-pressed="false" title="Attiva le risposte vocali">🔇 Voce OFF</button></form>
-          <p class="hint" id="aiApprovalNotice">Parlami normalmente: «Hey Jarvis, creami un sito web per Pinco Pallo», «Hey Jarvis, creami un sito multipagina per Pinco Pallo», «Apri l’ultimo sito multipagina», «Mostrami i lavori», «Apri l’ultimo sito», «Crea progetto: Nome», «Aggiungi attività: Titolo» oppure «Pianifica: Obiettivo». La creazione dei siti avvia automaticamente un incarico recuperabile nel Cloud; i progetti e le attività richiedono conferma. La chat AI può proporre piani, ma non può dichiararli approvati: verifica sempre le richieste nel Centro approvazioni. Nessun acquisto, invio o modifica viene eseguito dalla sola risposta della chat. La conversazione vocale richiede il tocco sul microfono e un browser Android compatibile; non è ancora un assistente a schermo spento.</p>
+          <form id="chatForm" class="chat-form"><input id="chatInput" autocomplete="off" placeholder="Scrivi un comando o una nota…" aria-label="Messaggio per JARVIS"><button class="send" type="submit">INVIA</button><button id="voiceBtn" class="voice" type="button" title="Dettatura vocale">🎙</button><button id="voiceOutputBtn" class="voice" type="button" aria-pressed="false" title="Attiva le risposte vocali">🔇 Voce OFF</button><button id="dialogueBtn" class="voice" type="button" aria-pressed="false" title="Avvia o termina la conversazione vocale">🎧 Avvia dialogo</button></form><p id="dialogueStatus" role="status" aria-live="polite">Premi Avvia dialogo una volta: con la pagina aperta JARVIS proverà ad ascoltare dopo ogni risposta, se il browser lo permette.</p>
+          <p class="hint" id="aiApprovalNotice">Parlami normalmente: «Hey Jarvis, creami un sito web per Pinco Pallo», «Hey Jarvis, creami un sito multipagina per Pinco Pallo», «Apri l’ultimo sito multipagina», «Mostrami i lavori», «Apri l’ultimo sito», «Crea progetto: Nome», «Aggiungi attività: Titolo» oppure «Pianifica: Obiettivo». La creazione dei siti avvia automaticamente un incarico recuperabile nel Cloud; i progetti e le attività richiedono conferma. La chat AI può proporre piani, ma non può dichiararli approvati: verifica sempre le richieste nel Centro approvazioni. Nessun acquisto, invio o modifica viene eseguito dalla sola risposta della chat. «Avvia dialogo» alterna ascolto e risposta senza premere il microfono per ogni frase, con pagina aperta e browser compatibile. Non funziona a schermo spento.</p>
         </article>
       </section>
       <footer>JARVIS v4 · Cloud Command Center · Azioni importanti soggette ad approvazione</footer>
@@ -199,27 +206,100 @@ const state={projects:[],tasks:[],memories:[],proposals:[],connected:false,loadi
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function notice(message,kind='status'){const el=$('cloudNotice');el.textContent=message;el.setAttribute('role',kind);$('connectionStatus').textContent=kind==='alert'?'ATTENZIONE':'CLOUD ONLINE';$('connectionStatus').className=kind==='alert'?'state-off':'state-ok'}
 let voiceOutputEnabled=false;
+let dialogueActive=false,dialogueListening=false,dialogueSpeaking=false,dialoguePending=false;
+let dialogueRecognition=null,dialogueEpoch=0,dialogueErrors=0,dialogueTimer=0;
+function dialogueStatus(message){$('dialogueStatus').textContent=message}
+function dialogueUi(){$('dialogueBtn').setAttribute('aria-pressed',String(dialogueActive));$('dialogueBtn').textContent=dialogueActive?'⏹ Termina dialogo':'🎧 Avvia dialogo'}
+function cancelDialogueRecognition(){
+ const r=dialogueRecognition;dialogueRecognition=null;dialogueListening=false;
+ if(r){r.onresult=r.onerror=r.onend=null;try{r.abort?.()}catch{}}
+}
+function stopDialogue(reason){
+ dialogueActive=false;dialogueEpoch++;clearTimeout(dialogueTimer);cancelDialogueRecognition();
+ dialoguePending=false;dialogueSpeaking=false;
+ try{window.speechSynthesis?.cancel()}catch{}
+ dialogueUi();dialogueStatus(reason||'Dialogo terminato.');
+}
+function resumeDialogue(){
+ clearTimeout(dialogueTimer);
+ const epoch=dialogueEpoch;
+ if(!dialogueActive||document.hidden||dialogueSpeaking||dialoguePending||chatBusy||dialogueListening)return;
+ dialogueTimer=setTimeout(()=>{if(epoch===dialogueEpoch)listenDialogue()},400);
+}
+function listenDialogue(){
+ if(!dialogueActive||document.hidden||dialogueSpeaking||dialoguePending||chatBusy||dialogueListening)return;
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){stopDialogue('Riconoscimento vocale non supportato. Usa la chat scritta.');return}
+ const r=new SR(),epoch=dialogueEpoch;
+ r.lang='it-IT';r.continuous=false;r.interimResults=false;r.maxAlternatives=1;
+ dialogueRecognition=r;dialogueListening=true;
+ r.onresult=e=>{
+  if(!dialogueActive||epoch!==dialogueEpoch||dialoguePending)return;
+  const text=String(e.results?.[0]?.[0]?.transcript||'').trim().slice(0,1500);
+  if(!text)return;
+  dialogueErrors=0;dialoguePending=true;cancelDialogueRecognition();
+  if(/^(?:stop|basta|fermati|termina (?:il )?dialogo)(?: jarvis)?[.!]?$/i.test(text)){stopDialogue('Ricevuto, signore. Dialogo terminato.');return}
+  dialogueStatus('Richiesta ricevuta. Sto elaborando…');
+  $('chatInput').value=text;$('chatForm').requestSubmit();
+ };
+ r.onerror=e=>{
+  if(!dialogueActive||epoch!==dialogueEpoch)return;
+  if(['not-allowed','service-not-allowed','audio-capture'].includes(e.error)){stopDialogue('Microfono non autorizzato o non disponibile.');return}
+  if(++dialogueErrors>=4){stopDialogue('Riconoscimento instabile. Riavvia il dialogo quando vuoi.');return}
+  dialogueStatus('Non ho capito bene. Riprovo…');
+ };
+ r.onend=()=>{
+  if(epoch!==dialogueEpoch)return;
+  if(dialogueRecognition===r)dialogueRecognition=null;
+  dialogueListening=false;
+  if(!dialoguePending)resumeDialogue();
+ };
+ try{r.start();dialogueStatus('Ti ascolto, signore…')}
+ catch(e){stopDialogue('Impossibile avviare il microfono. Verifica i permessi Android.')}
+}
 function jarvisSpeak(message){
- if(!voiceOutputEnabled||!('speechSynthesis' in window)||typeof SpeechSynthesisUtterance==='undefined')return;
+ if(!voiceOutputEnabled||!window.speechSynthesis||typeof SpeechSynthesisUtterance==='undefined')return;
  try{
+  if(dialogueActive)cancelDialogueRecognition();
   window.speechSynthesis.cancel();
-  const speech=new SpeechSynthesisUtterance(String(message).slice(0,950));
-  speech.lang='it-IT';speech.rate=0.96;speech.pitch=0.88;
+  const speech=new SpeechSynthesisUtterance(String(message).slice(0,950)),epoch=dialogueEpoch;
+  speech.lang='it-IT';speech.rate=0.97;speech.pitch=0.88;
+  if(dialogueActive){dialogueSpeaking=true;dialogueStatus('JARVIS risponde…')}
+  speech.onend=()=>{
+   if(!dialogueActive||epoch!==dialogueEpoch)return;
+   dialogueSpeaking=false;dialoguePending=false;resumeDialogue();
+  };
+  speech.onerror=()=>{
+   if(dialogueActive&&epoch===dialogueEpoch)stopDialogue('Riproduzione vocale interrotta. Riavvia il dialogo.');
+  };
   window.speechSynthesis.speak(speech);
- }catch(error){$('voiceOutputBtn').textContent='🔇 Voce non disponibile';voiceOutputEnabled=false}
+ }catch(e){
+  voiceOutputEnabled=false;$('voiceOutputBtn').textContent='🔇 Voce non disponibile';
+  if(dialogueActive)stopDialogue('Sintesi vocale non disponibile.');
+ }
 }
 function say(text,who='jarvis'){
  const box=document.createElement('div');box.className='bubble '+who;
  box.textContent=String(text);$('conversation').append(box);$('conversation').scrollTop=$('conversation').scrollHeight;
  if(who==='jarvis'&&chatBusy)jarvisSpeak(text);
 }
+$('dialogueBtn').onclick=()=>{
+ if(dialogueActive){stopDialogue('Dialogo terminato su tua richiesta.');return}
+ if(STATIC_PREVIEW){dialogueStatus('Apri JARVIS Cloud per parlare.');return}
+ if(!window.speechSynthesis||!(window.SpeechRecognition||window.webkitSpeechRecognition)){
+  dialogueStatus('Browser non compatibile. Prova Chrome Android o usa la chat scritta.');return
+ }
+ dialogueActive=true;dialogueErrors=0;dialoguePending=false;dialogueSpeaking=false;dialogueEpoch++;
+ voiceOutputEnabled=true;$('voiceOutputBtn').setAttribute('aria-pressed','true');$('voiceOutputBtn').textContent='🔊 Voce ON';
+ dialogueUi();jarvisSpeak('Sì, signore. Ti ascolto.');
+};
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&dialogueActive)stopDialogue('Pagina non in primo piano: dialogo fermato. Riavvialo quando torni.')});
 $('voiceOutputBtn').onclick=()=>{
- if(!('speechSynthesis' in window)){say('Risposta vocale non supportata su questo browser.');return}
- voiceOutputEnabled=!voiceOutputEnabled;
- $('voiceOutputBtn').setAttribute('aria-pressed',String(voiceOutputEnabled));
+ if(!window.speechSynthesis){say('Sintesi vocale non supportata.');return}
+ voiceOutputEnabled=!voiceOutputEnabled;$('voiceOutputBtn').setAttribute('aria-pressed',String(voiceOutputEnabled));
  $('voiceOutputBtn').textContent=voiceOutputEnabled?'🔊 Voce ON':'🔇 Voce OFF';
  if(voiceOutputEnabled)jarvisSpeak('Sì, signore. Risposta vocale attivata.');
- else window.speechSynthesis.cancel();
+ else{if(dialogueActive)stopDialogue('Dialogo terminato perché hai disattivato la voce.');window.speechSynthesis.cancel()}
 };
 async function api(path,options={}){
  if(STATIC_PREVIEW)throw Error('Anteprima statica: API Cloudflare disponibili solo dal dominio autenticato.');
@@ -593,9 +673,14 @@ $('chatForm').onsubmit=async e=>{
     await post('/api/chat-history',{role:'assistant',content:answer});
    }catch(historyError){say('La risposta AI è disponibile, ma lo storico non è stato salvato completamente: '+historyError.message)}
   }catch(err){say('AI non disponibile: '+err.message+' (il messaggio utente è stato salvato).')}
- }finally{chatBusy=false;submit.disabled=false}
+ }finally{
+  chatBusy=false;submit.disabled=false;
+  if(dialogueActive&&!dialogueSpeaking){
+   dialoguePending=false;resumeDialogue();
+  }
+ }
 };
-$('voiceBtn').onclick=()=>{if(!voiceOutputEnabled&&'speechSynthesis' in window){voiceOutputEnabled=true;$('voiceOutputBtn').textContent='🔊 Voce ON';$('voiceOutputBtn').setAttribute('aria-pressed','true')}
+$('voiceBtn').onclick=()=>{if(dialogueActive){dialogueStatus('Il dialogo è già attivo: parla normalmente.');return}if(!voiceOutputEnabled&&'speechSynthesis' in window){voiceOutputEnabled=true;$('voiceOutputBtn').textContent='🔊 Voce ON';$('voiceOutputBtn').setAttribute('aria-pressed','true')}
 
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){say('Dettatura non supportata dal browser. Usa la tastiera Android.');return}
