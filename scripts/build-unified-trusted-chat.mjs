@@ -18,24 +18,28 @@ const oldRead=`const [memory,projects,tasks]=await Promise.all([
           env.DB.prepare("SELECT name,description,status FROM projects ORDER BY created_at DESC LIMIT 12").all(),
           env.DB.prepare("SELECT title,status FROM tasks ORDER BY created_at DESC LIMIT 15").all()
         ]);
-        const context=JSON.stringify({memories:memory.results,projects:projects.results,tasks:tasks.results}).slice(0,5500);`;
-const newRead=`const [memory,projects,tasks,approvals,history]=await Promise.all([
+        const context=JSON.stringify({memories:memory.results,projects:projects.results,tasks:tasks.results}).slice(0,9000);`;
+const newRead=`const [memory,projects,tasks,approvals,history,siteJobs,siteDrafts,multiProjects]=await Promise.all([
           env.DB.prepare("SELECT content,category FROM memories ORDER BY created_at DESC LIMIT 12").all(),
           env.DB.prepare("SELECT name,description,status FROM projects ORDER BY created_at DESC LIMIT 12").all(),
           env.DB.prepare("SELECT title,status FROM tasks ORDER BY created_at DESC LIMIT 15").all(),
           env.DB.prepare("SELECT COUNT(*) AS n FROM action_proposals WHERE status='pending'").first(),
-          env.DB.prepare("SELECT role,content FROM chat_messages ORDER BY created_at DESC,rowid DESC LIMIT 9").all()
+          env.DB.prepare("SELECT role,content FROM chat_messages ORDER BY created_at DESC,rowid DESC LIMIT 9").all(),
+          env.DB.prepare("SELECT j.brief,j.status,j.updated_at,d.title FROM site_jobs j LEFT JOIN site_drafts d ON d.id=j.draft_id ORDER BY j.created_at DESC,j.id DESC LIMIT 5").all(),
+          env.DB.prepare("SELECT title,brief,created_at FROM site_drafts ORDER BY created_at DESC,id DESC LIMIT 5").all(),
+          env.DB.prepare("SELECT title,brief,created_at FROM site_projects ORDER BY created_at DESC,id DESC LIMIT 5").all()
         ]);
         const pendingProposals=Number(approvals?.n);
         if(!Number.isSafeInteger(pendingProposals)||pendingProposals<0)return json({error:"Approval status unavailable"},503,origin);
         const recentTurns=(history.results||[]).slice().reverse().filter(m=>m&&['user','assistant'].includes(m.role)&&typeof m.content==='string').map(m=>({role:m.role,content:m.content.slice(0,450)}));
         if(recentTurns.length&&recentTurns.at(-1).role==='user'&&recentTurns.at(-1).content===body.message.trim().slice(0,450))recentTurns.pop();
         const previousConversation=recentTurns.slice(-8);
-        const context=JSON.stringify({memories:memory.results,projects:projects.results,tasks:tasks.results,verified_approval_state:{pending_proposals:pendingProposals,chat_is_read_only:true,approved_by_chat:false,executed_by_chat:false}}).slice(0,5500);`;
+        const verifiedSites={recent_jobs:(siteJobs.results||[]).map(j=>({title:j.title||null,brief:j.brief,status:j.status,updated_at:j.updated_at})),saved_drafts:(siteDrafts.results||[]).map(d=>({title:d.title,brief:d.brief,created_at:d.created_at})),multipage_projects:(multiProjects.results||[]).map(p=>({title:p.title,brief:p.brief,created_at:p.created_at}))};
+        const context=JSON.stringify({memories:memory.results,projects:projects.results,tasks:tasks.results,verified_site_state:verifiedSites,verified_approval_state:{pending_proposals:pendingProposals,chat_is_read_only:true,approved_by_chat:false,executed_by_chat:false}}).slice(0,5500);`;
 assert.equal(candidate.split(oldRead).length,2);
 candidate=candidate.replace(oldRead,newRead);
 const oldLine='const system="Sei JARVIS, assistente personale italiano.';
-const newLine='const system="Sei JARVIS, assistente personale italiano. Lo stato delle proposte in attesa proviene dal database; questa chat NON ha verificato approvazioni pregresse. Non dichiarare piani approvati o azioni eseguite senza una prova esplicita. Se un utente chiede se hai eseguito qualcosa, rispondi che non puoi farlo da questa chat. ';
+const newLine='const system="Sei JARVIS, assistente personale italiano. Lo stato delle proposte in attesa proviene dal database; questa chat NON ha verificato approvazioni pregresse. Non dichiarare piani approvati o azioni eseguite senza una prova esplicita. Se verified_site_state.recent_jobs contiene un lavoro completed o saved_drafts contiene una bozza, conferma che il sito esiste davvero: non negare una creazione verificata dal database. Un sito salvato non è un sito pubblicato né un record nella lista projects. Questa API chat è di sola lettura, ma JARVIS possiede comandi operativi separati. Per riaprire un sito già creato suggerisci Apri l’ultimo sito. ';
 const i=candidate.indexOf(oldLine),j=candidate.indexOf(oldLine,i+1);
 assert(i>=0&&j===-1);
 candidate=candidate.replace(oldLine,newLine);
