@@ -185,7 +185,7 @@ button{color:#d0edff}
           <div class="panel-head"><div><p class="eyebrow">INTERFACCIA</p><h2>Parla con JARVIS</h2></div><span class="tag">AI CLOUD</span></div>
           <div id="conversation" class="conversation"><div class="bubble jarvis">Sì, signore. Sono collegato al centro di comando Cloud. Le operazioni importanti richiedono la tua approvazione.</div></div>
           <form id="chatForm" class="chat-form"><input id="chatInput" autocomplete="off" placeholder="Scrivi un comando o una nota…" aria-label="Messaggio per JARVIS"><button class="send" type="submit">INVIA</button><button id="voiceBtn" class="voice" type="button" title="Dettatura vocale">🎙</button><button id="voiceOutputBtn" class="voice" type="button" aria-pressed="false" title="Attiva le risposte vocali">🔇 Voce OFF</button></form>
-          <p class="hint" id="aiApprovalNotice">Parlami normalmente: «Hey Jarvis, creami un sito web per Pinco Pallo», «Mostrami i lavori», «Apri l’ultimo sito», «Crea progetto: Nome», «Aggiungi attività: Titolo» oppure «Pianifica: Obiettivo». La creazione dei siti avvia automaticamente un incarico recuperabile nel Cloud; i progetti e le attività richiedono conferma. La chat AI può proporre piani, ma non può dichiararli approvati: verifica sempre le richieste nel Centro approvazioni. Nessun acquisto, invio o modifica viene eseguito dalla sola risposta della chat. La conversazione vocale richiede il tocco sul microfono e un browser Android compatibile; non è ancora un assistente a schermo spento.</p>
+          <p class="hint" id="aiApprovalNotice">Parlami normalmente: «Hey Jarvis, creami un sito web per Pinco Pallo», «Hey Jarvis, creami un sito multipagina per Pinco Pallo», «Apri l’ultimo sito multipagina», «Mostrami i lavori», «Apri l’ultimo sito», «Crea progetto: Nome», «Aggiungi attività: Titolo» oppure «Pianifica: Obiettivo». La creazione dei siti avvia automaticamente un incarico recuperabile nel Cloud; i progetti e le attività richiedono conferma. La chat AI può proporre piani, ma non può dichiararli approvati: verifica sempre le richieste nel Centro approvazioni. Nessun acquisto, invio o modifica viene eseguito dalla sola risposta della chat. La conversazione vocale richiede il tocco sul microfono e un browser Android compatibile; non è ancora un assistente a schermo spento.</p>
         </article>
       </section>
       <footer>JARVIS v4 · Cloud Command Center · Azioni importanti soggette ad approvazione</footer>
@@ -385,6 +385,11 @@ let chatBusy=false;
 function parseJarvisCoreCommand(message){
  const input=String(message||'').replace(/^(?:ehi|hey)\s+jarvis[\s,:-]*/i,'').trim();
  // Safe, deterministic routing: never let a free-form AI answer authorize a write.
+ const multi=input.match(/^(?:crea|creami|costruisci|costruiscimi|realizza|fammi|sviluppa|preparami)\s+(?:(?:un|il)\s+)?(?:sito(?:\s+web)?\s+)?(?:multipagina|completo|a\s+(?:tre|3)\s+pagine)\s+(?:per|di)\s+(.+)$/i);
+ if(multi)return{kind:'multi-build',title:multi[1].trim()};
+ if(/^(?:apri|riapri|mostra(?:mi)?|recupera)\s+(?:(?:il\s+|l['’]\s*))?(?:mio\s+)?ultimo\s+(?:sito\s+)?multipagina[.!?]?$/i.test(input))
+  return{kind:'multi-open'};
+
  const website=input.match(/^(?:(?:puoi|potresti)\s+)?(?:crea|creami|costruisci|costruiscimi|realizza|fammi|sviluppa|preparami)\s+(?:(?:un|il)\s+)?(?:sito\s*(?:web)?|landing\s*page)\s*(?:per\s+|[:\-]\s*|di\s+)(.+)$/i)
   ||input.match(/^vorrei\s+che\s+mi\s+(?:creassi|facessi)\s+(?:(?:un|il)\s+)?(?:sito\s*(?:web)?|landing\s*page)\s+per\s+(.+)$/i);
  if(website)return {kind:'website',title:website[1].trim()};
@@ -414,7 +419,66 @@ function showSitePreviewInChat(site){
  $('conversation').append(frame);
  $('conversation').scrollTop=$('conversation').scrollHeight;
 }
+
+let lastMultiProject=null;
+function showMultipageProjectInChat(project){
+ const files=project?.files;
+ if(!files||typeof files!=='object'||!['index.html','servizi.html','contatti.html'].every(name=>typeof files[name]==='string'))return;
+ const wrapper=document.createElement('section');
+ wrapper.style.cssText='padding:12px;border:1px solid #2c5c7c;border-radius:12px;margin:8px 0';
+ const head=document.createElement('p');head.textContent='Sito multipagina privato: '+String(project.title||'Sito JARVIS').slice(0,110);
+ head.style.cssText='font-weight:bold;margin:0 0 10px';wrapper.append(head);
+ const toolbar=document.createElement('div');toolbar.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px';
+ const iframe=document.createElement('iframe');iframe.title='Anteprima isolata multipagina';
+ iframe.setAttribute('sandbox','');iframe.setAttribute('referrerpolicy','no-referrer');
+ iframe.style.cssText='width:100%;height:340px;border:1px solid #2c5c7c;border-radius:9px;background:white';
+ for(const [name,label] of [['index.html','Home'],['servizi.html','Servizi'],['contatti.html','Contatti']]){
+  const button=document.createElement('button');button.type='button';button.textContent=label;
+  button.className='small-btn';
+  button.onclick=()=>{iframe.srcdoc=files[name];for(const x of toolbar.querySelectorAll('[data-selected]'))x.removeAttribute('data-selected');button.setAttribute('data-selected','true')};
+  toolbar.append(button);
+  if(name==='index.html')button.setAttribute('data-selected','true');
+ }
+ const download=document.createElement('button');download.type='button';download.className='small-btn';
+ download.textContent='Scarica ZIP';download.onclick=async()=>{
+  if(!/^[0-9a-f-]{36}$/i.test(project.id||'')){say('ID del sito non valido. Nessun download.');return}
+  download.disabled=true;
+  try{
+   const res=await fetch('/api/site-projects/'+encodeURIComponent(project.id)+'/export',{credentials:'same-origin',cache:'no-store'});
+   if(!res.ok||!(res.headers.get('content-type')||'').includes('application/zip'))throw Error('Esportazione non disponibile');
+   const blob=await res.blob();if(blob.size>200000||blob.size<200)throw Error('Archivio non valido');
+   const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='jarvis-sito-multipagina.zip';
+   document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);
+  }catch(e){say('Download non riuscito: '+e.message)}finally{download.disabled=false}
+ };
+ toolbar.append(download);iframe.srcdoc=files['index.html'];
+ wrapper.append(toolbar,iframe);$('conversation').append(wrapper);$('conversation').scrollTop=$('conversation').scrollHeight;
+}
 async function runJarvisCoreCommand(command){
+ if(command.kind==='multi-open'){
+  const result=await api('/api/site-projects');
+  if(result.status!=='ok'||!Array.isArray(result.projects))throw Error('Archivio multipagina non disponibile');
+  const chosen=result.projects[0];
+  if(!chosen)return 'Non ci sono ancora siti multipagina salvati.';
+  const response=await api('/api/site-projects/'+encodeURIComponent(chosen.id));
+  if(response.status!=='ok'||!response.project?.files)throw Error('Progetto non recuperabile');
+  lastMultiProject=response.project;
+  return 'Ho recuperato il tuo ultimo sito multipagina «'+String(lastMultiProject.title).slice(0,90)+'». Le tre pagine sono nell’anteprima privata e puoi scaricare lo ZIP.';
+ }
+ if(command.kind==='multi-build'){
+  const brief='Crea un sito web multipagina professionale per '+command.title;
+  if(brief.length>1100)return 'Descrizione troppo lunga. Nessun progetto creato.';
+  const email=$('siteEmail').value.trim();
+  if(email&&!$('siteEmail').checkValidity())return 'Email non valida. Nessun progetto creato.';
+  // User-initiated, bounded two-attempt AI generation. Saving is server-verified; no public hosting.
+  const response=await post('/api/site-projects',{brief,style:$('siteStyle').value,contactEmail:email});
+  if(response.status!=='completed'||response.format!=='three-page-static-site'||response.production_deployed!==false||
+     response.requires_publication_approval!==true||response.project?.audit?.passed!==true||!response.project?.id)
+   throw Error('Il Cloud non ha confermato un progetto multipagina valido.');
+  lastMultiProject=response.project;
+  return 'Ho creato il sito multipagina «'+String(lastMultiProject.title).slice(0,90)+'» con Home, Servizi e Contatti. Controlli automatici superati; progetto salvato nel Cloud privato. Puoi vedere le tre anteprime e scaricare lo ZIP. Nessuna pubblicazione esterna.';
+ }
+
  if(command.kind==='site-status'||command.kind==='site-open'){
   // Read-only operations use authoritative authenticated D1 state, never inferred AI claims.
   const response=await api('/api/site-jobs');
@@ -512,6 +576,7 @@ $('chatForm').onsubmit=async e=>{
     const reply=await runJarvisCoreCommand(command);
     say(reply);
     if(((command.kind==='website'&&reply.startsWith('Ho generato il sito'))||(command.kind==='site-open'&&reply.startsWith('Ho recuperato il tuo sito')))&&lastGeneratedSite)showSitePreviewInChat(lastGeneratedSite);
+    if((command.kind==='multi-build'&&reply.startsWith('Ho creato il sito multipagina')||command.kind==='multi-open'&&reply.startsWith('Ho recuperato il tuo ultimo sito multipagina'))&&lastMultiProject)showMultipageProjectInChat(lastMultiProject);
     try{await post('/api/chat-history',{role:'assistant',content:reply})}
     catch(e){say('Comando gestito, ma il messaggio di conferma non è stato salvato nello storico: '+e.message,'system')}
     return;
