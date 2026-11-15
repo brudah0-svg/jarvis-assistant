@@ -594,7 +594,7 @@ async function runJarvisCoreCommand(command){
   const [health,remediations]=await Promise.all([
    api('/api/autonomy/status'),api('/api/autonomy/remediations')
   ]);
-  if(!health||!['ok','passed','warning','attention','failed','not_run','unavailable'].includes(health.status)
+  if(!health||!['healthy','blocked','attention','not_run'].includes(health.status)
      ||!Array.isArray(health.pending_approvals)||remediations?.status!=='ok'||!Array.isArray(remediations.cases))
    throw Error('Non posso verificare l’autodiagnostica: nessuna correzione effettuata.');
   const open=remediations.cases.filter(x=>x.state==='needs_review');
@@ -618,7 +618,7 @@ async function runJarvisCoreCommand(command){
   const proposalCount=prepared.proposals.length;
   return overview+' Sul progetto JARVIS ho completato '+diagnostic.total_checks+
     ' verifiche: '+diagnostic.passed+' superate, '+diagnostic.warnings+' avvisi. '+
-    (proposalCount?'Ho preparato '+prepared.generated+' nuove proposte ('+proposalCount+
+    (proposalCount?'Ho preparato '+prepared.generated+' '+(prepared.generated===1?'nuova proposta':'nuove proposte')+' ('+proposalCount+
       ' totali, comprese quelle già presenti). Puoi esaminarle in Self-Improvement.':
       'Nessuna anomalia specifica richiede una proposta: non invento correzioni.')+
     ' Questo controllo riguarda struttura e dati del progetto, non una revisione automatica del codice. QA Guardian verifica il codice separatamente su GitHub. Non ho modificato né distribuito codice; serve approvazione per gli aggiornamenti importanti.';
