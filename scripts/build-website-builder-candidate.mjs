@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+execFileSync(process.execPath,['scripts/build-unified-trusted-chat.mjs'],{stdio:'inherit'});
+let source=readFileSync('dist/jarvis-unified-trusted-chat.mjs','utf8');
+const core=readFileSync('cloudflare/workers/site-builder-core.mjs','utf8').replace(/^export /gm,'');
+const route=readFileSync('cloudflare/workers/site-builder-route.inc','utf8');
+const anchor='if(path==="/api/ai-chat" && method==="POST"){';
+assert.equal(source.split(anchor).length,2);
+assert(!source.includes('if(path==="/api/site-builder"'));
+assert(core.includes('function renderSiteHtml')&&core.includes('function parseSiteContent'));
+assert(source.includes('pending_proposals:pendingProposals'),'Trusted chat safeguard missing');
+source=core+'\n'+source.replace(anchor,route+anchor);
+writeFileSync('dist/jarvis-website-builder-candidate.mjs',source);
+console.log('JARVIS Website Builder build-only candidate SHA-256 '+createHash('sha256').update(source).digest('hex'));

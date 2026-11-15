@@ -1,0 +1,26 @@
+name: JARVIS Website Builder security and generation
+on:
+  pull_request:
+    paths:
+      - 'cloudflare/workers/site-builder-core.mjs'
+      - 'cloudflare/workers/site-builder-route.inc'
+      - 'cloudflare/ui/command-v4-unified.html'
+      - 'scripts/build-website-builder-candidate.mjs'
+      - 'tests/website-builder-contract.mjs'
+      - '.github/workflows/website-builder.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-builder:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Website Builder Worker candidate
+        run: node tests/website-builder-contract.mjs
