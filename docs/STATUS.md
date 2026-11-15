@@ -201,6 +201,28 @@
 - This verifies an improved truthfulness boundary, **not** complete autonomous capability or a post-update physical Android functional test.
 - See [UNIFIED_AI_CHAT_TRUTH_RELEASE_2026-11-15.md](UNIFIED_AI_CHAT_TRUTH_RELEASE_2026-11-15.md).
 
+## Priority reset: build JARVIS core first (2026-11-15)
+
+The owner's explicit development order is **(1) finish a useful operative JARVIS, (2) add self-diagnostics and autonomous improvements**. Do not spend further iterations on stylistic refinements or speculative self-upgrade infrastructure while key operational functionality is missing. Preserve the safety and recovery controls already present, but do not treat them as a substitute for features.
+
+### First operational vertical slice: deployed
+
+- PR #44 merged after successful Android-like Chromium acceptance, source safety and AI truth checks. The unified chat recognizes explicit Italian commands `Crea progetto: Nome`, `Aggiungi attività: Titolo` and `Pianifica: Obiettivo`.
+- Creating a project or task requires a human confirmation dialog. Tasks require an unambiguous Cloud project selection. Duplicate titles are refused; a planning command uses the existing read-only `/api/plan` endpoint and never creates tasks.
+- The Cloudflare Worker production version is now `0700f5dd-40c7-4cce-9f46-dffbd515f3db`. Its deployed JavaScript SHA-256 `1e4b200776716a8b14d64a0c91228ae738335bb9a5bba8738f5c4acc77cd5666` matched the verified UI-only candidate after read-back. Legacy and unified routes remain, Access policy and all seven bindings are unchanged, and production D1 `quick_check=ok` with 2 projects, 20 tasks and 0 pending proposals.
+- No test-created projects or tasks were written to production; actual user-issued commands are still subject to user confirmation. Previous production version `a768f5bf-ab08-47dc-9876-03bddf9dc042` remains the rollback reference.
+- The physical Android screen has not yet been used to demonstrate these **new** chat commands. CI uses synthetic data; do not equate passing CI with personal-device acceptance.
+
+### Core capabilities to build next, in order
+
+1. **Goal-to-project workflow:** turn a goal into a reviewable set of project tasks with a project-specific approval, save the resulting task plan and resume it later. Do not imply the existing generic rule-based planner is autonomous work execution.
+2. **Agent job queue:** persistent jobs, distinct specialist roles, dependencies, retry/timeout limits, status and auditable outputs. Initially support one or two useful low-risk workflows before scaling to parallel orchestration.
+3. **Useful tools:** vetted GitHub code workflows and read-only searches, then user-approved edits, real test results and rollback. Do not falsely claim tool execution from model text.
+4. **Voice, notifications and reliable Android usage:** improve recognition and accessible results, keep all modules reachable from one protected origin.
+5. **Only then** add self-audit, issue detection, sandboxed patch proposals, regression and limited reversible self-upgrade with permission rules and human approval for consequential changes.
+
+Cost target: use existing free-tier services where practical, without claiming that future Cloudflare usage is guaranteed free.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
