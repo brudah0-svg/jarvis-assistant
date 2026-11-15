@@ -482,6 +482,9 @@ function parseJarvisCoreCommand(message){
     return {kind:'voice-cancel'};
   }
  }
+ // Explicit improvement request: queue a bounded proposal task. Do NOT perform code writes here.
+ if(/^(?:avvia (?:l['’])?(?:auto)?miglioramento|migliora(?:ti)? (?:da solo|automaticamente|il tuo codice)|auto[- ]?migliorati|inizia ad auto[- ]?migliorarti)(?:[.!?]*)$/i.test(input))
+  return {kind:'autoimprove'};
  // The user asks JARVIS to inspect itself; never interpret this as permission to deploy code.
  if(/^(?:(?:auto)?analizzati|analizza il tuo (?:codice|sistema)|controlla come migliorarti|migliorati|valuta come migliorarti)(?:\s+e\s+(?:proponi|prepara)(?:\s+(?:dei|i))?\s+miglioramenti|\s+e\s+proponi\s+come\s+migliorarti)?[.!?]*$/i.test(input))
   return {kind:'self-audit'};
@@ -588,6 +591,17 @@ function showMultipageProjectInChat(project){
 }
 async function runJarvisCoreCommand(command){
  if(command.kind==='voice-cancel')return 'Ricevuto, signore. Operazione annullata: nessuna modifica al Cloud.';
+ if(command.kind==='autoimprove'){
+  if(!state.availability.memories)throw Error('Coda Cloud non disponibile: non ho avviato nessun miglioramento.');
+  const goal='Migliora in sicurezza il riconoscimento vocale dei comandi italiani di JARVIS. Non modificare autorizzazioni, approvazioni o pubblicazione.';
+  const match=state.memories.find(m=>m.category==='JARVIS_AUTOIMPROVE_TASK'&&String(m.content||'').trim()===goal);
+  if(match)return 'Una richiesta di automiglioramento è già presente nella coda. QA Guardian e l’agente GitHub la elaboreranno al prossimo controllo programmato, se il collegamento AI è disponibile. Nessuna modifica in produzione.';
+  const saved=await post('/api/memory',{content:goal,category:'JARVIS_AUTOIMPROVE_TASK'});
+  if(saved.status!=='created'||!saved.memory?.id)throw Error('Coda non confermata dal Cloud.');
+  await loadAll();
+  return 'Richiesta di automiglioramento registrata nel Cloud. Il ciclo GitHub programmato proverà a preparare una correzione limitata al riconoscimento vocale, ripetere i test e proporre una revisione. Non posso garantire che venga trovata una modifica valida. Nessuna pubblicazione automatica.';
+ }
+
  if(command.kind==='self-audit'){
   // All evidence comes from existing protected APIs. Never infer approvals from model text.
   // Executor and proposal preparation write only audit rows, not user project contents or code.

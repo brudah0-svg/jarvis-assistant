@@ -1,0 +1,140 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+import {resolve} from 'node:path';
+
+// Deliberately small, auditable patch surface: only the noisy Italian ASR parser.
+export const TARGET='cloudflare/ui/command-v4-unified.html';
+export const GATEWAY='https://jarvis-autoimprove.jarvisproj3ct.workers.dev';
+export const ALLOWED_REGION_START=' const noisyPrefix=input.match(';
+export const ALLOWED_REGION_END=' if(noisyPrefix){';
+const forbidden=/\b(?:fetch|XMLHttpRequest|WebSocket|Function|eval|import|require|localStorage|sessionStorage|document|window|globalThis|process|navigator|confirm|post|api|approve|deploy|publish|writeFile|exec|spawn|child_process)\b|(?:<script|<iframe|github_pat_|ghp_|sk-|Bearer\s+)/i;
+export const hash=s=>createHash('sha256').update(s).digest('hex');
+
+export function extractPatch(raw){
+ let text=String(raw||'').trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'');
+ if(text.length>5000)throw Error('Proposal too long');
+ const p=JSON.parse(text);
+ if(!p||typeof p.find!=='string'||typeof p.replace!=='string'||typeof p.reason!=='string')throw Error('Invalid proposal fields');
+ return p;
+}
+export function safePatch(original,p){
+ assert.equal(typeof original,'string');
+ if(!p.find||!p.replace)return {changed:false,reason:'AI found no safe change'};
+ if(p.find.length<30||p.find.length>800||p.replace.length<30||p.replace.length>1000)throw Error('Patch size outside limits');
+ if(p.find===p.replace)return {changed:false,reason:'No change'};
+ if(forbidden.test(p.find)||forbidden.test(p.replace))throw Error('Forbidden operation in patch');
+ if(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(p.find+p.replace))throw Error('Control characters rejected');
+ const funStart=original.indexOf('function parseJarvisCoreCommand(message){');
+ const funEnd=original.indexOf('function showSitePreviewInChat(',funStart);
+ if(funStart<0||funEnd<=funStart)throw Error('Core parser anchors missing');
+ const start=original.indexOf(ALLOWED_REGION_START,funStart);
+ const end=original.indexOf(ALLOWED_REGION_END,start);
+ if(start<funStart||end<=start||end>funEnd)throw Error('Permitted area missing');
+ const slice=original.slice(start,end);
+ if(!slice.includes(p.find)||slice.split(p.find).length!==2)throw Error('Patch does not match exactly once within permitted ASR region');
+ if(original.split(p.find).length!==2)throw Error('Patch not unique across source');
+ if(!p.replace.includes('const noisyPrefix=input.match(')||!p.replace.includes('/i);'))throw Error('Only ASR noisyPrefix pattern can be amended');
+ if(!p.find.includes('const noisyPrefix=input.match(')||!p.find.includes('/i);'))throw Error('Entire ASR expression must be matched');
+ if(p.replace.includes('\n')&&p.replace.split('\n').length>4)throw Error('Multiline code addition forbidden');
+ const updated=original.slice(0,start)+slice.replace(p.find,p.replace)+original.slice(end);
+ if(updated===original)return {changed:false,reason:'No effective change'};
+ const diffLen=Math.abs(updated.length-original.length);
+ if(diffLen>280)throw Error('Too large ASR change');
+ return {changed:true,source:updated,reason:p.reason.slice(0,250),original_sha256:hash(original),updated_sha256:hash(updated)};
+}
+export function validateParserWithNode(html){
+ const open=html.indexOf('<script>"use strict";');
+ const close=html.indexOf('</script>',open);
+ if(open<0||close<=open)throw Error('UI JavaScript not found');
+ const js=html.slice(open+'<script>'.length,close);
+ execFileSync(process.execPath,['--check','-'],{input:js,encoding:'utf8',timeout:15000});
+ return true;
+}
+function run(command,args,options={}){
+ return execFileSync(command,args,{encoding:'utf8',timeout:540000,stdio:['ignore','pipe','pipe'],...options});
+}
+function tokenRequest(audience){
+ const url=process.env.ACTIONS_ID_TOKEN_REQUEST_URL,token=process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+ if(!url||!token)throw Error('GitHub OIDC unavailable');
+ return {url:url+(url.includes('?')?'&':'?')+'audience='+encodeURIComponent(audience),token};
+}
+async function getIdentity(){
+ const {url,token}=tokenRequest('jarvis-autoimprove-v1');
+ const r=await fetch(url,{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(10000)});
+ if(!r.ok)throw Error('OIDC token could not be obtained');
+ const data=await r.json();if(typeof data.value!=='string')throw Error('OIDC response invalid');return data.value;
+}
+async function gateway(path,body,identity){
+ const r=await fetch(GATEWAY+path,{method:'POST',headers:{Authorization:'Bearer '+identity,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(55000)});
+ const json=await r.json().catch(()=>({error:'Invalid JSON'}));
+ if(!r.ok)throw Error('Gateway '+path+' HTTP '+r.status+': '+String(json.error||'error'));
+ return json;
+}
+function report(details){
+ mkdirSync('dist/autoimprove',{recursive:true});
+ const redacted={...details,run_id:process.env.GITHUB_RUN_ID||'local',production_modified:false,requires_review:true};
+ writeFileSync('dist/autoimprove/result.json',JSON.stringify(redacted,null,2)+'\n');
+ const text=['## JARVIS AutoImprove', '', '- Stato: '+redacted.status,'- Motivo: '+String(redacted.reason||'—'),'- Tentativi: '+String(redacted.attempts||0),'- Modifiche dirette a produzione: nessuna','- Revisione umana necessaria prima dell’unione','',''];
+ if(redacted.pull_request)text.push('- Revisione: '+redacted.pull_request);
+ if(process.env.GITHUB_STEP_SUMMARY)writeFileSync(process.env.GITHUB_STEP_SUMMARY,text.join('\n'),{flag:'a'});
+ console.log(text.join('\n'));
+}
+async function main(){
+ if(process.env.CI!=='true'||process.env.GITHUB_REPOSITORY!=='brudah0-svg/jarvis-assistant'||process.env.GITHUB_REF!=='refs/heads/main')throw Error('Not a trusted main GitHub Actions execution');
+ const identity=await getIdentity();
+ const requested=String(process.env.AUTOIMPROVE_GOAL||'').slice(0,320);
+ const claim=await gateway('/claim',{goal:requested},identity);
+ if(claim.status!=='claimed'||!claim.job){report({status:claim.status||'idle',reason:claim.notice||'No jobs'});return}
+ const id=claim.job.id,goal=claim.job.goal;
+ const original=readFileSync(TARGET,'utf8');
+ const sectionStart=original.indexOf(ALLOWED_REGION_START);
+ const sectionEnd=original.indexOf(ALLOWED_REGION_END,sectionStart);
+ if(sectionStart<0||sectionEnd<0)throw Error('No permitted ASR area');
+ const context=original.slice(Math.max(0,sectionStart-300),Math.min(original.length,sectionEnd+200));
+ let feedback='',proposed=null,attempts=0,result='';
+ try{
+  for(let i=0;i<2;i++){
+   attempts++;
+   const generated=await gateway('/generate',{job_id:id,context,feedback},identity);
+   try{
+    const patch=extractPatch(generated.proposal);
+    const outcome=safePatch(original,patch);
+    if(!outcome.changed){result=outcome.reason;break}
+    validateParserWithNode(outcome.source);
+    writeFileSync(TARGET,outcome.source);
+    // Contracts + Android simulation run without Cloudflare secrets, DB or network permissions.
+    run('node',['tests/qa-guardian-contract.mjs']);
+    run('npm',['test']);
+    // The synthetic Android test must also pass; CI workflow installs Chromium first.
+    run('node',['tests/unified-browser-android.mjs']);
+    proposed={...outcome,attempts};break;
+   }catch(e){feedback=String(e?.stderr||e?.message||e).slice(-700);writeFileSync(TARGET,original)}
+  }
+  if(!proposed){await gateway('/complete',{job_id:id,status:'no_change',result:'No safe verified patch. '+feedback.slice(0,100)},identity);report({status:'no_change',reason:result||feedback,attempts});return}
+  // No deployment; only a branch + PR. GitHub Actions GITHUB_TOKEN cannot trigger a second privileged workflow.
+  const branch='jarvis/autoimprove-'+String(process.env.GITHUB_RUN_ID||'').replace(/\D/g,'').slice(0,15);
+  run('git',['config','user.name','jarvis-autoimprove[bot]']);
+  run('git',['config','user.email','41898282+github-actions[bot]@users.noreply.github.com']);
+  run('git',['checkout','-b',branch]);
+  run('git',['add','--',TARGET]);
+  run('git',['commit','-m','fix(voice): guarded Italian ASR improvement ('+id.slice(0,8)+')']);
+  run('git',['push','origin','HEAD:refs/heads/'+branch]);
+  const message='JARVIS AutoImprove proposal (verified by QA Guardian).\n\nGoal: '+goal+'\n\nAI rationale: '+proposed.reason+'\n\nTests: npm test, QA Guardian contract, synthetic Android Chromium.\n\nRisk: generated change requires human review. **No automatic merge or production deployment.**\n\nJob: '+id;
+  let pr='https://github.com/brudah0-svg/jarvis-assistant/compare/main...'+branch+'?expand=1';
+  try{
+   const r=run('gh',['pr','create','--draft','--base','main','--head',branch,'--title','JARVIS AutoImprove: guarded voice parser patch','--body',message]);
+   const parsed=r.match(/https:\/\/github\.com\/brudah0-svg\/jarvis-assistant\/pull\/\d+/);
+   if(parsed)pr=parsed[0];
+  }catch(e){console.warn('PR creation unavailable; branch and comparison link retained')}
+  await gateway('/complete',{job_id:id,status:'proposed',result:pr},identity);
+  report({status:'proposed',reason:proposed.reason,attempts,pull_request:pr,branch});
+ }catch(error){
+  try{await gateway('/complete',{job_id:id,status:'failed',result:String(error?.message||error).slice(0,250)},identity)}catch{}
+  report({status:'failed',reason:String(error?.message||error).slice(0,250),attempts});
+  process.exitCode=1;
+ }
+}
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(e=>{console.error('JARVIS AutoImprove failed safely: '+e.message);process.exitCode=1});

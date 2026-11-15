@@ -470,6 +470,20 @@ try{
  assert.equal(tasks.length,tasksBeforeAudit,'Self audit cannot modify tasks');
  assert.equal(projects.length,projectsBeforeAudit,'Self audit cannot modify project records');
  assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0,'Self audit cannot deploy code');
+ // Spoken self-improvement must only create a bounded, durable queue entry.
+ const improvementBefore=memories.filter(x=>x.category==='JARVIS_AUTOIMPROVE_TASK').length;
+ const improvementProjects=projects.length,improvementTasks=tasks.length;
+ await page.locator('#chatInput').fill('Hey Jarvis, migliorati automaticamente');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Richiesta di automiglioramento registrata'),{timeout:15000});
+ assert.equal(memories.filter(x=>x.category==='JARVIS_AUTOIMPROVE_TASK').length,improvementBefore+1,'AutoImprove must queue one job');
+ assert.equal(projects.length,improvementProjects,'AutoImprove may not change project records');
+ assert.equal(tasks.length,improvementTasks,'AutoImprove may not change tasks');
+ await page.locator('#chatInput').fill('Hey Jarvis, migliorati automaticamente');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('richiesta di automiglioramento è già presente'),{timeout:15000});
+ assert.equal(memories.filter(x=>x.category==='JARVIS_AUTOIMPROVE_TASK').length,improvementBefore+1,'Repeat command may not duplicate queued requests');
+ assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0,'AutoImprove command may not deploy or invoke GitHub directly');
  assert.deepEqual(jsErrors,[],'No unhandled JS errors');
  assert.deepEqual(externalNetwork,[],'No external domains were contacted');
  mkdirSync('dist/browser-artifacts',{recursive:true});
