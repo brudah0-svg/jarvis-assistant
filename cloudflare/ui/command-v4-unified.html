@@ -192,7 +192,7 @@ button{color:#d0edff}
           <div class="panel-head"><div><p class="eyebrow">JARVIS · INTERFACCIA PRINCIPALE</p><h2>Parla con JARVIS</h2></div><span class="tag">UNICA CONVERSAZIONE</span></div>
           <div id="conversation" class="conversation"><div class="bubble jarvis">Sì, signore. Sono collegato al centro di comando Cloud. Le operazioni importanti richiedono la tua approvazione.</div></div>
           <form id="chatForm" class="chat-form"><input id="chatInput" autocomplete="off" placeholder="Scrivi un comando o una nota…" aria-label="Messaggio per JARVIS"><button class="send" type="submit">INVIA</button><button id="voiceBtn" class="voice" type="button" title="Dettatura vocale">🎙</button><button id="voiceOutputBtn" class="voice" type="button" aria-pressed="false" title="Attiva le risposte vocali">🔇 Voce OFF</button><button id="dialogueBtn" class="voice" type="button" aria-pressed="false" title="Avvia o termina la conversazione vocale">🎧 Avvia dialogo</button></form><p id="dialogueStatus" role="status" aria-live="polite">Premi Avvia dialogo una volta: con la pagina aperta JARVIS proverà ad ascoltare dopo ogni risposta, se il browser lo permette.</p>
-          <p class="hint" id="aiApprovalNotice">Parlami normalmente: «Hey Jarvis, creami un sito web per Pinco Pallo», «Hey Jarvis, creami un sito multipagina per Pinco Pallo», «Apri l’ultimo sito multipagina», «Mostrami i lavori», «Apri l’ultimo sito», «Crea progetto: Nome», «Aggiungi attività: Titolo» oppure «Pianifica: Obiettivo». La creazione dei siti avvia automaticamente un incarico recuperabile nel Cloud; i progetti e le attività richiedono conferma. La chat AI può proporre piani, ma non può dichiararli approvati: verifica sempre le richieste nel Centro approvazioni. Nessun acquisto, invio o modifica viene eseguito dalla sola risposta della chat. «Avvia dialogo» alterna ascolto e risposta senza premere il microfono per ogni frase, con pagina aperta e browser compatibile. Non funziona a schermo spento.</p>
+          <p class="hint" id="aiApprovalNotice">Parlami normalmente: «Ciao Jarvis, mi crei un progetto per il sito di un elettricista», «Hey Jarvis, creami un sito web per Pinco Pallo», «Hey Jarvis, creami un sito multipagina per Pinco Pallo», «Apri l’ultimo sito multipagina», «Mostrami i lavori», «Apri l’ultimo sito», «Crea progetto: Nome», «Aggiungi attività: Titolo» oppure «Pianifica: Obiettivo». La creazione dei siti avvia automaticamente un incarico recuperabile nel Cloud; i progetti e le attività richiedono conferma. La chat AI può proporre piani, ma non può dichiararli approvati: verifica sempre le richieste nel Centro approvazioni. Nessun acquisto, invio o modifica viene eseguito dalla sola risposta della chat. «Avvia dialogo» alterna ascolto e risposta senza premere il microfono per ogni frase, con pagina aperta e browser compatibile. Non funziona a schermo spento.</p>
         </article>
       </section>
       <footer>JARVIS v4 · Cloud Command Center · Azioni importanti soggette ad approvazione</footer>
@@ -463,7 +463,10 @@ let chatRevision=0;
 let chatBusy=false;
 // Core command execution: explicit, user-initiated and reversible. Never invoke AI for a write.
 function parseJarvisCoreCommand(message){
- const input=String(message||'').replace(/^(?:ehi|hey)\s+jarvis[\s,:-]*/i,'').trim();
+ const input=String(message||'')
+  .replace(/^(?:(?:ciao|salve|buongiorno|buonasera|ehi|hey)\s+)?jarvis[\s,:;.!?-]*/i,'')
+  .replace(/^(?:ciao|salve|buongiorno|buonasera)[\s,:;.!?-]+(?:ehi|hey)?\s*jarvis[\s,:;.!?-]*/i,'')
+  .trim();
  // Safe, deterministic routing: never let a free-form AI answer authorize a write.
  const multi=input.match(/^(?:crea|creami|costruisci|costruiscimi|realizza|fammi|sviluppa|preparami)\s+(?:(?:un|il)\s+)?(?:sito(?:\s+web)?\s+)?(?:multipagina|completo|a\s+(?:tre|3)\s+pagine)\s+(?:per|di)\s+(.+)$/i);
  if(multi)return{kind:'multi-build',title:multi[1].trim()};
@@ -479,8 +482,20 @@ function parseJarvisCoreCommand(message){
  if(/^(?:(?:apri|mostra(?:mi)?|riapri|recupera)\s+)(?:(?:il\s+|l['’]\s*)?(?:mio\s+)?)?(?:ultimo|più\s+recente)\s+(?:sito|lavoro|incarico)(?:\s+(?:creato|completato))?[.!?]?$/i.test(input))
    return {kind:'site-open'};
 
- const project=input.match(/^(?:crea|creami|avvia)\s+(?:(?:un|il)\s+)?(?:nuovo\s+)?progetto\s*[:\-]?\s+(.+)$/i);
- if(project)return {kind:'project',title:project[1].trim()};
+ const project=input.match(/^(?:(?:per favore|perfavore)\s+)?(?:(?:puoi|potresti)\s+)?(?:crea|creami|avvia|apri|fai|fammi|prepara|preparami|imposta|impostami|mi\s+crei|mi\s+creeresti|mi\s+fai|mi\s+prepari|vorrei\s+(?:creare|che\s+mi\s+creassi))\s+(?:(?:un|il)\s+)?(?:nuovo\s+)?progetto(?:\s+(?:per|chiamato|dal\s+nome|di|su)\s+|[\s:–-]+)(.+)$/i);
+ if(project){
+  const details=project[1].trim().replace(/[.!?]+$/,'').trim();
+  if(!details)return {kind:'project-clarify'};
+  // Store a readable project name; do not confuse a project record with an actual site.
+  const topic=details.replace(/^(?:un|una|il|la)\s+/i,'').trim();
+  const isWeb=/\b(?:sito|website|pagina web|web app)\b/i.test(topic);
+  const person=topic.match(/(?:per\s+)?(?:un\s+)?(?:sito\s+web\s+(?:di|per)\s+)?(?:un\s+)?(elettricista|officina|ristorante|parrucchiere|negozio|idraulico)\b/i);
+  let title=isWeb&&person?'Sito web per '+person[1]:topic;
+  if(title.length>160)return {kind:'project-clarify'};
+  return {kind:'project',title,description:details};
+ }
+ if(/\b(?:crea(?:mi)?|mi\s+crei|fare|fammi|vorrei\s+creare)\b.{0,80}\bprogetto\b/i.test(input))
+  return {kind:'project-clarify'};
  const task=input.match(/^(?:aggiungi|crea|creami)\s+(?:(?:una|un)\s+)?(?:nuova\s+)?(?:attivit[àa]|task)\s*[:\-]?\s+(.+)$/i);
  if(task)return {kind:'task',title:task[1].trim()};
  const planning=input.match(/^(?:pianifica|prepara (?:un )?piano per|organizza)\s*[:\-]?\s+(.+)$/i);
@@ -535,6 +550,8 @@ function showMultipageProjectInChat(project){
  wrapper.append(toolbar,iframe);$('conversation').append(wrapper);$('conversation').scrollTop=$('conversation').scrollHeight;
 }
 async function runJarvisCoreCommand(command){
+ if(command.kind==='project-clarify')return 'Posso creare un progetto nel Cloud, ma mi serve un nome preciso. Prova: «Jarvis, mi crei un progetto per il sito di un elettricista». Non ho creato nulla.';
+
  if(command.kind==='multi-open'){
   const result=await api('/api/site-projects');
   if(result.status!=='ok'||!Array.isArray(result.projects))throw Error('Archivio multipagina non disponibile');
@@ -614,7 +631,7 @@ async function runJarvisCoreCommand(command){
   if(!state.availability.projects)throw Error('Elenco progetti Cloud non disponibile: nessuna modifica eseguita.');
   if(state.projects.some(p=>p.name.trim().toLocaleLowerCase('it')===command.title.toLocaleLowerCase('it')))return 'Un progetto con questo nome esiste già: nessun duplicato creato.';
   if(!window.confirm('Confermi la creazione del progetto “'+command.title+'” nel tuo Cloud JARVIS?'))return 'Creazione annullata. Nessuna modifica eseguita.';
-  const result=await post('/api/projects',{name:command.title,description:'Creato su richiesta esplicita nella chat JARVIS'});
+  const result=await post('/api/projects',{name:command.title,description:'Richiesta JARVIS: '+String(command.description||command.title).slice(0,700)});
   if(!result.project?.id)throw Error('Il server non ha confermato il nuovo progetto. Verifica il registro prima di riprovare.');
   await loadAll();
   return 'Progetto “'+command.title+'” creato e confermato dal server Cloud.';
