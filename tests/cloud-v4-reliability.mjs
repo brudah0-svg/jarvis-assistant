@@ -10,7 +10,7 @@ const take=(start,end)=>{
 };
 const render=take('function render(){','function enableStaticPreview(){');
 const load=take('async function loadAll(){',"$('activeProject').onchange=render;");
-const chat=take("$('chatForm').onsubmit=async e=>{","$('voiceBtn').onclick=()=>{");
+const chat=take('let chatRevision=0;',"$('voiceBtn').onclick=()=>{");
 
 function element(){
  return {
