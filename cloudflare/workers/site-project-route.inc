@@ -7,6 +7,19 @@ if(path==="/api/site-projects"&&method==="GET"){
   return json({status:"ok",projects:records.results||[]},200,origin);
  }catch{return json({error:"Archivio multipagina non disponibile: verifica la migrazione"},503,origin)}
 }
+if(/^\/api\/site-projects\/[0-9a-f-]+\/export$/i.test(path)&&method==="GET"){
+ if(!env.DB)return json({error:"Archivio progetti non disponibile"},503,origin);
+ const id=path.slice("/api/site-projects/".length,-"/export".length);
+ if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return json({error:"ID non valido"},400,origin);
+ try{
+  const record=await env.DB.prepare("SELECT files_json FROM site_projects WHERE id=?").bind(id).first();
+  if(!record)return json({error:"Progetto non trovato"},404,origin);
+  const files=JSON.parse(record.files_json);
+  if(!inspectSiteProject(files).passed)return json({error:"Progetto non valido"},500,origin);
+  const bytes=siteProjectZip(files);
+  return new Response(bytes,{headers:{"Content-Type":"application/zip","Content-Disposition":"attachment; filename=\"jarvis-sito-multipagina.zip\"","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","Content-Security-Policy":"default-src 'none'"}});
+ }catch{return json({error:"Esportazione non disponibile"},503,origin)}
+}
 if(path.startsWith("/api/site-projects/")&&method==="GET"){
  if(!env.DB)return json({error:"Archivio progetti non disponibile"},503,origin);
  const id=path.slice("/api/site-projects/".length);
@@ -62,10 +75,7 @@ if(path==="/api/site-projects"&&method==="POST"){
   const write=await env.DB.prepare("INSERT INTO site_projects(id,title,brief,style,contact_email,files_json,audit_json) VALUES (?,?,?,?,?,?,?)")
    .bind(id,plan.title.slice(0,110),brief,style,email,encoded,JSON.stringify(audit)).run();
   if(Number(write?.meta?.changes)!==1)throw Error("Project insertion not confirmed");
-  const zip=siteProjectZip(files);
-  let binary='';for(let k=0;k<zip.length;k+=8192)binary+=String.fromCharCode(...zip.subarray(k,k+8192));
-  const zipBase64=btoa(binary);
-  return json({status:"completed",project:{id,title:plan.title,brief,style,files,audit,attempts},zipBase64,
+  return json({status:"completed",project:{id,title:plan.title,brief,style,files,audit,attempts},
    format:"three-page-static-site",production_deployed:false,requires_publication_approval:true,
    external_actions_executed:false,notice:"Tre pagine statiche controllate e salvate nel Cloud privato. Nessuna pubblicazione."},201,origin);
  }catch(error){
