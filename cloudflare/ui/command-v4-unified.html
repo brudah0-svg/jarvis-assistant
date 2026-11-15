@@ -191,7 +191,7 @@ button{color:#d0edff}
         <article class="panel wide assistant">
           <div class="panel-head"><div><p class="eyebrow">JARVIS · INTERFACCIA PRINCIPALE</p><h2>Parla con JARVIS</h2></div><span class="tag">UNICA CONVERSAZIONE</span></div>
           <div id="conversation" class="conversation"><div class="bubble jarvis">Sì, signore. Sono collegato al centro di comando Cloud. Le operazioni importanti richiedono la tua approvazione.</div></div>
-          <form id="chatForm" class="chat-form"><input id="chatInput" autocomplete="off" placeholder="Scrivi un comando o una nota…" aria-label="Messaggio per JARVIS"><button class="send" type="submit">INVIA</button><button id="voiceBtn" class="voice" type="button" title="Dettatura vocale">🎙</button><button id="voiceOutputBtn" class="voice" type="button" aria-pressed="false" title="Attiva le risposte vocali">🔇 Voce OFF</button><button id="dialogueBtn" class="voice" type="button" aria-pressed="false" title="Avvia o termina la conversazione vocale">🎧 Avvia dialogo</button></form><p id="dialogueStatus" role="status" aria-live="polite">Premi Avvia dialogo una volta: con la pagina aperta JARVIS proverà ad ascoltare dopo ogni risposta, se il browser lo permette.</p>
+          <form id="chatForm" class="chat-form"><input id="chatInput" autocomplete="off" placeholder="Scrivi un comando o una nota…" aria-label="Messaggio per JARVIS"><button class="send" type="submit">INVIA</button><button id="voiceBtn" class="voice" type="button" title="Dettatura vocale">🎙</button><button id="voiceOutputBtn" class="voice" type="button" aria-pressed="false" title="Attiva le risposte vocali">🔇 Voce OFF</button><button id="dialogueBtn" class="voice" type="button" aria-pressed="false" title="Avvia o termina la conversazione vocale">🎧 Avvia dialogo</button></form><p id="dialogueStatus" role="status" aria-live="polite">Premi Avvia dialogo una volta. Per progetti e attività puoi confermare a voce con «Sì, confermo» o annullare con «No, annulla». La pagina deve rimanere aperta.</p>
           <p class="hint" id="aiApprovalNotice">Parlami normalmente: «Ciao Jarvis, mi crei un progetto per il sito di un elettricista», «Hey Jarvis, creami un sito web per Pinco Pallo», «Hey Jarvis, creami un sito multipagina per Pinco Pallo», «Apri l’ultimo sito multipagina», «Mostrami i lavori», «Apri l’ultimo sito», «Crea progetto: Nome», «Aggiungi attività: Titolo» oppure «Pianifica: Obiettivo». La creazione dei siti avvia automaticamente un incarico recuperabile nel Cloud; i progetti e le attività richiedono conferma. La chat AI può proporre piani, ma non può dichiararli approvati: verifica sempre le richieste nel Centro approvazioni. Nessun acquisto, invio o modifica viene eseguito dalla sola risposta della chat. «Avvia dialogo» alterna ascolto e risposta senza premere il microfono per ogni frase, con pagina aperta e browser compatibile. Non funziona a schermo spento.</p>
         </article>
       </section>
@@ -201,6 +201,9 @@ button{color:#d0edff}
   <script>"use strict";
 const $=id=>document.getElementById(id);
 const STATIC_PREVIEW=/(^|\.)github\.io$/i.test(window.location.hostname);
+// One conversation first; advanced modules and manual builder remain available below.
+const mainChatPanel=$('chatForm')?.closest('article');
+if(mainChatPanel?.parentElement?.classList.contains('grid'))mainChatPanel.parentElement.prepend(mainChatPanel);
 const LIVE_CLOUD_ORIGIN='https://jarvis-backend.jarvisproj3ct.workers.dev';
 const state={projects:[],tasks:[],memories:[],proposals:[],connected:false,loading:false,availability:{projects:false,tasks:false,memories:false,proposals:false}};
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -208,6 +211,7 @@ function notice(message,kind='status'){const el=$('cloudNotice');el.textContent=
 let voiceOutputEnabled=false;
 let dialogueActive=false,dialogueListening=false,dialogueSpeaking=false,dialoguePending=false;
 let dialogueRecognition=null,dialogueEpoch=0,dialogueErrors=0,dialogueTimer=0;
+let pendingVoiceAction=null; // One short-lived, low-risk operation awaiting explicit spoken confirmation.
 function dialogueStatus(message){$('dialogueStatus').textContent=message}
 function dialogueUi(){$('dialogueBtn').setAttribute('aria-pressed',String(dialogueActive));$('dialogueBtn').textContent=dialogueActive?'⏹ Termina dialogo':'🎧 Avvia dialogo'}
 function cancelDialogueRecognition(){
@@ -216,7 +220,7 @@ function cancelDialogueRecognition(){
 }
 function stopDialogue(reason){
  dialogueActive=false;dialogueEpoch++;clearTimeout(dialogueTimer);cancelDialogueRecognition();
- dialoguePending=false;dialogueSpeaking=false;
+ pendingVoiceAction=null;dialoguePending=false;dialogueSpeaking=false;
  try{window.speechSynthesis?.cancel()}catch{}
  dialogueUi();dialogueStatus(reason||'Dialogo terminato.');
 }
@@ -467,6 +471,17 @@ function parseJarvisCoreCommand(message){
   .replace(/^(?:(?:ciao|salve|buongiorno|buonasera|ehi|hey)\s+)?jarvis[\s,:;.!?-]*/i,'')
   .replace(/^(?:ciao|salve|buongiorno|buonasera)[\s,:;.!?-]+(?:ehi|hey)?\s*jarvis[\s,:;.!?-]*/i,'')
   .trim();
+ // Spoken confirmation is valid only for the exact project/task prepared in this session.
+ // An unrelated utterance cancels it: later generic affirmations cannot trigger a write.
+ if(pendingVoiceAction){
+  const waiting=pendingVoiceAction;pendingVoiceAction=null;
+  if(Date.now()<=waiting.expiresAt){
+   if(/^(?:s[ìi](?:[ ,]+confermo)?|confermo|procedi|va bene)[.!?]*$/i.test(input))
+    return {...waiting.command,voiceConfirmed:true};
+   if(/^(?:no(?:[ ,]+annulla)?|annulla|lascia stare|non farlo)[.!?]*$/i.test(input))
+    return {kind:'voice-cancel'};
+  }
+ }
  // Safe, deterministic routing: never let a free-form AI answer authorize a write.
  const multi=input.match(/^(?:crea|creami|costruisci|costruiscimi|realizza|fammi|sviluppa|preparami)\s+(?:(?:un|il)\s+)?(?:sito(?:\s+web)?\s+)?(?:multipagina|completo|a\s+(?:tre|3)\s+pagine)\s+(?:per|di)\s+(.+)$/i);
  if(multi)return{kind:'multi-build',title:multi[1].trim()};
@@ -569,6 +584,7 @@ function showMultipageProjectInChat(project){
  wrapper.append(toolbar,iframe);$('conversation').append(wrapper);$('conversation').scrollTop=$('conversation').scrollHeight;
 }
 async function runJarvisCoreCommand(command){
+ if(command.kind==='voice-cancel')return 'Ricevuto, signore. Operazione annullata: nessuna modifica al Cloud.';
  if(command.kind==='website-clarify')return 'Ho capito che vuoi creare un sito, ma la dettatura non è abbastanza chiara. Dimmi per chi deve essere il sito, ad esempio «Jarvis, creami un sito web per un idraulico». Nessun lavoro è stato avviato.';
  if(command.kind==='project-clarify')return 'Posso creare un progetto nel Cloud, ma mi serve un nome preciso. Prova: «Jarvis, mi crei un progetto per il sito di un elettricista». Non ho creato nulla.';
 
@@ -650,7 +666,11 @@ async function runJarvisCoreCommand(command){
  if(command.kind==='project'){
   if(!state.availability.projects)throw Error('Elenco progetti Cloud non disponibile: nessuna modifica eseguita.');
   if(state.projects.some(p=>p.name.trim().toLocaleLowerCase('it')===command.title.toLocaleLowerCase('it')))return 'Un progetto con questo nome esiste già: nessun duplicato creato.';
-  if(!window.confirm('Confermi la creazione del progetto “'+command.title+'” nel tuo Cloud JARVIS?'))return 'Creazione annullata. Nessuna modifica eseguita.';
+  if(dialogueActive&&!command.voiceConfirmed){
+   pendingVoiceAction={command:{kind:'project',title:command.title,description:command.description},expiresAt:Date.now()+90000};
+   return 'Sto per creare il progetto «'+command.title+'». Confermi? Rispondi «Sì, confermo» oppure «No, annulla». Non ho ancora salvato nulla.';
+  }
+  if(!command.voiceConfirmed&&!window.confirm('Confermi la creazione del progetto “'+command.title+'” nel tuo Cloud JARVIS?'))return 'Creazione annullata. Nessuna modifica eseguita.';
   const result=await post('/api/projects',{name:command.title,description:'Richiesta JARVIS: '+String(command.description||command.title).slice(0,700)});
   if(!result.project?.id)throw Error('Il server non ha confermato il nuovo progetto. Verifica il registro prima di riprovare.');
   await loadAll();
@@ -664,7 +684,12 @@ async function runJarvisCoreCommand(command){
  if(!projectId)return 'Seleziona prima il progetto dal menu Attività e ripeti il comando. Nessuna attività creata.';
  const project=active.find(p=>p.id===projectId);
  if(!project)return 'Progetto selezionato non valido. Nessuna modifica eseguita.';
- if(!window.confirm('Creare l’attività “'+command.title+'” nel progetto “'+project.name+'”?'))return 'Creazione annullata. Nessuna modifica eseguita.';
+ if(command.voiceConfirmed&&command.voiceProjectId!==projectId)return 'Il progetto selezionato è cambiato: non ho creato nessuna attività.';
+ if(dialogueActive&&!command.voiceConfirmed){
+  pendingVoiceAction={command:{kind:'task',title:command.title,voiceProjectId:projectId},expiresAt:Date.now()+90000};
+  return 'Sto per aggiungere l’attività «'+command.title+'» al progetto «'+project.name+'». Confermi? Rispondi «Sì, confermo» oppure «No, annulla». Nessuna modifica ancora eseguita.';
+ }
+ if(!command.voiceConfirmed&&!window.confirm('Creare l’attività “'+command.title+'” nel progetto “'+project.name+'”?'))return 'Creazione annullata. Nessuna modifica eseguita.';
  const result=await post('/api/tasks',{title:command.title,project_id:projectId});
  if(!result.task?.id)throw Error('Il server non ha confermato la nuova attività. Controlla il progetto prima di riprovare.');
  await loadAll();
