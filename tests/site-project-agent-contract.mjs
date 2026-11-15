@@ -80,7 +80,7 @@ res=await hit('/api/site-projects/'+generated.project.id+'/export');
 assert.equal(res.status,200);assert.equal(res.headers.get('content-type'),'application/zip');
 const output=Buffer.from(await res.arrayBuffer());assert(output.includes(Buffer.from('servizi.html')));assert.equal(output.readUInt32LE(0),0x04034b50);
 assert.equal((await hit('/api/site-projects/not-valid')).status,400);
-assert.equal((await hit('/api/site-projects/not-valid/export')).status,404);
+assert.equal((await hit('/api/site-projects/not-valid/export')).status,400);
 artificialFailure=true;aiCalls=0;
 res=await hit('/api/site-projects','POST',{brief:'Crea sito multipagina per officina con tre pagine'});
 assert.equal(res.status,201);assert.equal((await res.json()).project.attempts,2);
