@@ -1,0 +1,30 @@
+name: JARVIS independent encrypted backup verifier
+on:
+  pull_request:
+    paths:
+      - 'backup-verify-offline.html'
+      - 'tests/offline-backup-contract.mjs'
+      - 'tests/offline-backup-browser.mjs'
+      - '.github/workflows/offline-backup-verifier.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-like-offline-validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify standalone source policy
+        run: node tests/offline-backup-contract.mjs
+      - name: Install isolated browser testing dependency
+        run: npm install --no-save --no-audit --no-fund playwright@1.56.1
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Exercise local encryption and decryption safety
+        run: node tests/offline-backup-browser.mjs
