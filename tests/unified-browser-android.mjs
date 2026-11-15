@@ -112,7 +112,7 @@ try{
  await upload();
  await page.waitForFunction(()=>document.querySelector('#workspaceImportStatus')?.textContent?.includes('Importazione completata'),{timeout:25000});
  assert.equal(await page.locator('#projectCount').textContent(),'2');
- assert.equal(await page.locator('#taskCount').textContent(),'3');
+ assert.equal(await page.locator('#taskCount').textContent(),'2','One of the three imported and existing tasks is complete, so only two remain open');
  assert.equal(projects.length,2);
  assert.equal(tasks.length,3);
  assert.equal(memories.length,2);
