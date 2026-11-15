@@ -10,7 +10,7 @@ const take=(start,end)=>{
 };
 const render=take('function render(){','function enableStaticPreview(){');
 const load=take('async function loadAll(){',"$('activeProject').onchange=render;");
-const chat=take("$('chatForm').onsubmit=async e=>{","$('voiceBtn').onclick=()=>{");
+const chat=take('let chatRevision=0;',"$('voiceBtn').onclick=()=>{");
 
 function element(){
  return {
@@ -85,21 +85,33 @@ ctx.post=async (url,data)=>{
 vm.runInContext(chat,ctx);
 $('chatInput').value='Synthetic conversation';
 await $('chatForm').onsubmit({preventDefault(){}});
-assert.equal(steps[0][0],'/api/ai-chat');
-assert.equal(steps[1][1],'user');
-assert.equal(steps[2][0],'user-saved','User history save must finish before assistant entry');
+assert.equal(steps[0][1],'user');
+assert.equal(steps[1][0],'user-saved','User history write must complete before inference');
+assert.equal(steps[2][0],'/api/ai-chat');
 assert.equal(steps[3][1],'assistant');
 assert.equal($('chatForm').querySelector('.send').disabled,false);
 assert(messages.some(([msg])=>msg==='Test answer'));
 
 const before=steps.length;
 ctx.post=async(url,data)=>{
- if(url==='/api/ai-chat')return {answer:'Another answer'};
+ if(url==='/api/ai-chat')throw Error('AI must not run on failed history write');
  if(url==='/api/chat-history'&&data.role==='user')throw Error('Synthetic save failure');
  steps.push([url,data.role]);
 };
 $('chatInput').value='Second test';
 await $('chatForm').onsubmit({preventDefault(){}});
-assert.equal(steps.length,before,'Assistant history write must not follow a failed user write');
-assert(messages.some(([msg])=>msg.includes('storico non è stato salvato completamente')));
-console.log('Cloud v4 reliability tests passed: partial outage isolation, honest counters, disabled writes, ordered chat history, save failures.');
+assert.equal(steps.length,before,'No inference or assistant write after a failed user save');
+assert.equal($('chatInput').value,'Second test','User text must be restored after failed save');
+assert(messages.some(([msg])=>msg.includes('Messaggio non salvato nel cloud')));
+ctx.post=async(url,data)=>{
+ steps.push([url,data.role||null]);
+ if(url==='/api/ai-chat')throw Error('Synthetic AI outage');
+ return {status:'saved'};
+};
+$('chatInput').value='Third test';
+await $('chatForm').onsubmit({preventDefault(){}});
+assert.equal(steps.at(-2)[1],'user');
+assert.equal(steps.at(-1)[0],'/api/ai-chat');
+assert(messages.some(([msg])=>msg.includes('il messaggio utente è stato salvato')));
+assert.equal($('chatForm').querySelector('.send').disabled,false);
+console.log('Cloud v4 reliability tests passed: partial outage isolation, ordered durable user-first chat, AI failures, failed-save retries.');
