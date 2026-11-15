@@ -26,8 +26,7 @@ const isolatedDb={
    if(sql.startsWith('SELECT * FROM tasks ORDER BY'))return {results:fixtureTasks};
    throw Error('Unexpected staging SQL all '+sql);
   }
- }};
- }
+ }}
 };
 const productionDb={
  prepare(sql){return{
@@ -68,12 +67,12 @@ assert.equal(healthy.body.read_only_api_smoke?.write_blocked,true);
 assert.equal(healthy.body.synthetic_suite?.passed,5);
 assert.equal(healthy.body.synthetic_suite?.total,5);
 assert.equal(healthy.body.database_counts_distinct,true);
-assert.deepEqual(stagingCalls.slice().sort((a,b)=>a.path.localeCompare(b.path)),[
+assert.deepEqual(stagingCalls.slice().sort((a,b)=>(a.path+':'+a.method).localeCompare(b.path+':'+b.method)),[
  {path:'/staging-check',method:'GET'},
  {path:'/api/projects',method:'GET'},
  {path:'/api/tasks',method:'POST'},
  {path:'/api/tasks',method:'GET'}
-].sort((a,b)=>a.path.localeCompare(b.path)));
+].sort((a,b)=>(a.path+':'+a.method).localeCompare(b.path+':'+b.method)));
 assert.equal(fixtureProjects.length,1);
 assert.equal(fixtureTasks.length,1);
 assert.equal((await verify({DB:productionDb,VERSION:env.VERSION})).status,503,'Missing private binding must fail closed');
