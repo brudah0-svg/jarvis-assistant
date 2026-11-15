@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#07111f">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'">
+<title>JARVIS · Verifica backup offline</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 70% 0,#143853,#07111f 62%);color:#e9f6ff;font:15px system-ui,sans-serif;min-height:100vh}
+main{max-width:650px;margin:auto;padding:32px 18px 70px}header{color:#79d9ff;letter-spacing:2px;font-weight:700;font-size:13px;margin-bottom:22px}
+h1{font-size:clamp(24px,6vw,32px);margin:0 0 10px}h2{font-size:18px}p,small{color:#afc6d7;line-height:1.6}small{display:block}
+.panel{border:1px solid #315878;background:#0d2237;border-radius:17px;padding:19px;margin:23px 0}label{font-weight:600;display:block;margin:17px 0 8px}
+input{color:#eaf8ff;background:#061423;border:1px solid #4b7494;width:100%;padding:12px;border-radius:9px;font:inherit;min-width:0}
+input[type=file]{font-size:13px;overflow-wrap:anywhere}button{background:#1e587d;border:1px solid #5cadd6;color:white;padding:13px 18px;border-radius:10px;font:inherit;font-weight:650;margin:15px 0 10px;max-width:100%}button:disabled{opacity:.55}
+#result{white-space:pre-wrap;overflow-wrap:anywhere;font-weight:550;padding:12px;border:1px solid #315878;border-radius:9px;background:#071b2e}
+#result[data-state=ok]{border-color:#397d77;color:#99f0d6}#result[data-state=error]{border-color:#99515d;color:#ffb3bd}
+.note{border-left:3px solid #3678a5;padding-left:13px}code{word-break:break-word}
+</style>
+</head>
+<body><main>
+<header>◉ J.A.R.V.I.S. / LOCAL RECOVERY</header>
+<h1>Verifica indipendente del backup</h1>
+<p>Apri il tuo archivio <code>.jarvisbak</code> e verifica la cifratura e l'integrità dei dati, anche senza accedere all'account Cloudflare. Questa pagina non invia il file né la password ad alcun server.</p>
+<section class="panel">
+<h2>Controllo sul dispositivo</h2>
+<label for="archive">File di backup cifrato</label>
+<input id="archive" type="file" accept=".jarvisbak,application/json,application/octet-stream">
+<label for="password">Password del backup</label>
+<input id="password" type="password" autocomplete="off">
+<button id="verify" type="button">Verifica il file in locale</button>
+<p id="result" role="status" aria-live="polite" data-state="idle">Nessun file verificato.</p>
+<small>Il controllo non modifica né ripristina il database. Nessun dato viene memorizzato da questa pagina.</small>
+</section>
+<p class="note">Una verifica riuscita conferma che il file cifrato è leggibile e coerente, ma non prova un ripristino completo del database. Conserva la password separatamente e tieni una seconda copia dell'archivio cifrato fuori dal telefono.</p>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const enc=new TextEncoder(),dec=new TextDecoder();
+function bytes64(value,expected=0){
+ if(typeof value!=='string'||!value||!/^[A-Za-z0-9+/]+={0,2}$/.test(value))throw Error('base64');
+ const raw=atob(value);
+ if(expected&&raw.length!==expected)throw Error('length');
+ return Uint8Array.from(raw,c=>c.charCodeAt(0));
+}
+const hex=bytes=>Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('');
+async function digest(bytes){return hex(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)))}
+async function verifySnapshot(data,expectedId){
+ if(!data||data.format!=='JARVIS_VERIFIED_D1_BACKUP_V1')throw Error('snapshot');
+ const m=data.metadata;
+ if(!m||m.verified!==true||m.id!==expectedId||!Array.isArray(data.schema)||!Array.isArray(data.rows))throw Error('metadata');
+ if(!Number.isInteger(m.table_count)||m.table_count<1||m.table_count>120||!Number.isInteger(m.rows_total)||m.rows_total<0||m.rows_total>15000)throw Error('counts');
+ if(data.rows.length!==m.rows_total)throw Error('rows');
+ if(!/^[a-f0-9]{64}$/.test(m.schema_sha256)||!/^[a-f0-9]{64}$/.test(m.rows_sha256))throw Error('hashes');
+ const tables=new Set();
+ const schemaParts=[];
+ for(const item of data.schema){
+  if(!item||!['table','index','view','trigger'].includes(item.object_type)||typeof item.object_name!=='string'||typeof item.definition!=='string')throw Error('schema');
+  schemaParts.push(item.object_type+'|'+item.object_name+'|'+item.definition);
+  if(item.object_type==='table'){if(tables.has(item.object_name))throw Error('duplicate table');tables.add(item.object_name)}
+ }
+ if(tables.size!==m.table_count)throw Error('table count');
+ const rowParts=[],keys=new Set(),counts=Object.fromEntries([...tables].map(name=>[name,0]));
+ for(const item of data.rows){
+  if(!item||!tables.has(item.table_name)||typeof item.record_key!=='string'||typeof item.record_json!=='string')throw Error('invalid row');
+  const key=item.table_name+'\u0000'+item.record_key;
+  if(keys.has(key))throw Error('duplicate row');
+  keys.add(key);counts[item.table_name]++;
+  const obj=JSON.parse(item.record_json);
+  if(!obj||typeof obj!=='object'||Array.isArray(obj))throw Error('invalid row JSON');
+  rowParts.push(key+'\u0000'+item.record_json);
+ }
+ const [schemaSha,rowsSha]=await Promise.all([
+  digest(enc.encode(schemaParts.join('\n'))),
+  digest(enc.encode(rowParts.join('\n')))
+ ]);
+ if(schemaSha!==m.schema_sha256||rowsSha!==m.rows_sha256)throw Error('snapshot hash mismatch');
+ return {tables:m.table_count,rows:m.rows_total,createdAt:typeof m.created_at==='string'?m.created_at:'non disponibile',restoreTested:m.isolated_restore_tested===true};
+}
+async function verifyFile(file,password){
+ if(!file||file.size>20000000||file.size<100||typeof password!=='string'||!password)throw Error('input');
+ const envelope=JSON.parse(await file.text());
+ if(envelope?.format!=='JARVIS_AES256_GCM_BACKUP_V1'||envelope.kdf!=='PBKDF2_SHA256'||envelope.iterations!==310000||typeof envelope.snapshot_id!=='string')throw Error('format');
+ const salt=bytes64(envelope.salt,16),iv=bytes64(envelope.iv,12),ciphertext=bytes64(envelope.ciphertext),expectedHash=bytes64(envelope.plaintext_sha256,32);
+ if(ciphertext.length<17)throw Error('ciphertext');
+ const base=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveKey']);
+ const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:310000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
+ const plain=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv},key,ciphertext));
+ if(await digest(plain)!==hex(expectedHash))throw Error('envelope hash');
+ return verifySnapshot(JSON.parse(dec.decode(plain)),envelope.snapshot_id);
+}
+$('verify').addEventListener('click',async()=>{
+ const button=$('verify'),status=$('result'),file=$('archive').files?.[0],password=$('password').value;
+ button.disabled=true;status.dataset.state='working';status.textContent='Verifica crittografica in corso sul dispositivo…';
+ try{
+  const info=await verifyFile(file,password);
+  status.dataset.state='ok';
+  status.textContent='Backup verificato localmente: '+info.tables+' tabelle, '+info.rows+' record.\nImpronte SHA-256 valide. Creato: '+info.createdAt+'.\n'+(info.restoreTested?'Il servizio ha registrato un test isolato di ripristino.':'Il ripristino integrale di questo snapshot non risulta collaudato.')+'\nNessun dato inviato. Nessun ripristino effettuato.';
+ }catch(e){
+  status.dataset.state='error';
+  status.textContent='Verifica non riuscita: password errata, file danneggiato o formato non riconosciuto. Nessun dato inviato.';
+ }finally{
+  $('password').value='';button.disabled=false;
+ }
+});
+</script>
+</body>
+</html>
