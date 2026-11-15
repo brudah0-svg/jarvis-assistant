@@ -15,6 +15,7 @@ const projects=[{id:'cloud-base',name:'Progetto già nel Cloud',description:'Sin
 const tasks=[{id:'task-base',project_id:'cloud-base',title:'Attività Cloud',status:'pending'}];
 const memories=[{id:'memory-base',content:'Memoria Cloud',category:'Altro',created_at:'2026-11-15'}];
 const proposals=[];
+const savedDrafts=[];
 const requests=[],writes=[];
 let counter=0,externalNetwork=[];
 const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}).end(JSON.stringify(data))};
@@ -29,6 +30,8 @@ const server=createServer(async(req,res)=>{
   if(!path.startsWith('/api/')){res.writeHead(404).end('Not Found');return}
   requests.push({path,method:req.method});
   if(req.method==='GET'){
+   if(path==='/api/site-drafts')return json(res,200,{status:'ok',drafts:savedDrafts.map(({id,title,brief,style,created_at})=>({id,title,brief,style,created_at}))});
+   if(path.startsWith('/api/site-drafts/')){const found=savedDrafts.find(x=>x.id===path.split('/').pop());return json(res,found?200:404,found?{status:'ok',draft:found}:{error:'Not found'});}
    if(path==='/api/projects')return json(res,200,{projects});
    if(path==='/api/tasks')return json(res,200,{tasks});
    if(path==='/api/memory')return json(res,200,{memories});
@@ -55,7 +58,16 @@ const server=createServer(async(req,res)=>{
    const memory={id:'created-memory-'+(++counter),content:body.content,category:body.category,created_at:'2026-11-15'};
    memories.push(memory);return json(res,201,{status:'created',memory});
   }
-  if(path==='/api/site-builder'&&req.method==='POST')return json(res,200,{status:'generated',format:'standalone-static-html',html:'<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Pinco Pallo</title></head><body><h1>Pinco Pallo - Sito creato</h1><p>Impianti elettrici</p>'+('<section><p>Testi di prova per il collaudo mobile del sito. Nessun dato personale o esterno.</p></section>'.repeat(8))+'</body></html>',siteTitle:'Pinco Pallo',requires_publication_approval:true,production_deployed:false,operations_executed:false});
+  if(path==='/api/site-builder'&&req.method==='POST'){
+    const html='<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Pinco Pallo</title></head><body><h1>Pinco Pallo - Sito creato</h1><p>Impianti elettrici</p>'+('<section><p>Testi di prova per il collaudo mobile del sito. Nessun dato personale o esterno.</p></section>'.repeat(8))+'</body></html>';
+    let draftId=null,saved=false;
+    if(body.saveDraft===true){
+      draftId='00000000-0000-4000-8000-'+String(++counter).padStart(12,'0');
+      savedDrafts.push({id:draftId,title:'Pinco Pallo',brief:body.brief,style:body.style,contact_email:body.contactEmail||'',html,created_at:'2026-11-15 15:40:00'});
+      saved=true;
+    }
+    return json(res,200,{status:'generated',format:'standalone-static-html',html,siteTitle:'Pinco Pallo',saved,draftId,requires_publication_approval:true,production_deployed:false,operations_executed:false});
+  }
   if(path==='/api/plan'&&req.method==='POST')return json(res,200,{status:'proposal',goal:body.goal,steps:[{order:1,title:'Preparare il prototipo'},{order:2,title:'Collaudare su Android'}],requires_approval:true,notice:'Bozza sintetica senza scritture'});
   if(path==='/api/chat-history'&&req.method==='POST')return json(res,201,{status:'created'});
   if(path==='/api/ai-chat'&&req.method==='POST')return json(res,200,{answer:'Risposta sintetica, nessuna AI reale utilizzata.'});
@@ -179,6 +191,13 @@ try{
  await page.locator('#siteGenerate').click();
  await page.waitForFunction(()=>document.querySelector('#siteDownload')&&!document.querySelector('#siteDownload').disabled,{timeout:15000});
  assert.equal(writes.filter(w=>w.path==='/api/site-builder').length,builderBefore+1);
+ assert.equal(savedDrafts.length,1,'User-selected save must store a single draft in fake Cloud');
+ await page.waitForFunction(()=>document.querySelector('#siteDraftsList')?.querySelector('button[data-site-draft-id]'),{timeout:15000});
+ assert.equal(await page.locator('#siteDraftsList button').count(),1,'Saved draft appears in the list');
+ await page.locator('#siteDraftsList button[data-site-draft-id]').click();
+ await page.waitForFunction(()=>document.querySelector('#siteBuilderStatus')?.textContent?.includes('recuperata dal Cloud'),{timeout:15000});
+ assert.equal(await page.locator('#siteDownload').isEnabled(),true);
+
  assert.equal(await page.locator('#sitePreview').getAttribute('sandbox'),'','Preview must disable scripts and browser capabilities');
  assert.equal(await page.locator('#sitePreview').isHidden(),false);
  assert((await page.locator('#sitePreview').getAttribute('srcdoc')).includes('Pinco Pallo - Sito creato'));
@@ -192,6 +211,9 @@ try{
  await page.locator('#chatForm button[type=submit]').click();
  await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Ho generato il sito'),{timeout:15000});
  assert.equal(writes.filter(w=>w.path==='/api/site-builder').length,builderAfter+1,'Voice/text chat command must dispatch to Website Builder');
+ assert.equal(savedDrafts.length,2,'Website command also saves the draft in private Cloud');
+ assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0,'Saved drafts must not publish a site');
+
 
  assert.deepEqual(jsErrors,[],'No unhandled JS errors');
  assert.deepEqual(externalNetwork,[],'No external domains were contacted');
