@@ -71,6 +71,14 @@
 - Current deployed staging is `b27360b9-b467-4770-beeb-bf8f08629a6d`, verified at SHA-256 `9b12762d54cb53ae883a1ee1d0525a454012c646c05af69be0b3f24883fe7c6a`. An authenticated remote regression on this exact version remains required.
 - Production remains unchanged and the release gate is blocked pending remote verification, off-account encrypted backup, Android acceptance and approval.
 
+## Android-like browser smoke validated (2026-11-15)
+
+- GitHub PR #20 merged, adding isolated Chromium UI tests for Android-like 360/393/412 px widths, touch interaction support, synthetic dashboard reads, disabled write controls, no external API calls or horizontal overflow.
+- The mobile browser GitHub Actions run passed, with a synthetic screenshot uploaded as a short-lived GitHub artifact.
+- This test runs on CI, **not** on the user's physical Android device or a remote authenticated Cloudflare browser session.
+- Cloudflare staging runtime 10/10, real authentication smoke, independent encrypted off-account backup, current release candidate provenance and explicit production release approval remain outstanding.
+- ChatGPT monitoring was re-enabled for the existing 6-hour task; it does not automatically perform deployments or data changes.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
