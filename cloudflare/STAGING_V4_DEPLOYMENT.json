@@ -1,9 +1,9 @@
 {
   "format": "jarvis-staging-v4-deployed-source-v1",
   "worker": "jarvis-staging",
-  "version_id": "6c50ebad-cd5a-48af-b3e2-fbe8a2c66dcf",
-  "source_sha256": "15e680cc19d5a19931f27bdd0e93857178175286a94f2e4412f639907464e22f",
-  "source_chars": 330480,
+  "version_id": "80077801-2762-4ed3-8581-42b806032c4a",
+  "source_sha256": "b845663d63775b34d681bf7294287117b7915fa61f0b88722383e7d07c2b5f0a",
+  "source_chars": 330634,
   "built_from": [
     "cloudflare/workers/jarvis-staging.mjs",
     "cloudflare/ui/command-v4-staging-snapshot.html",
@@ -11,7 +11,8 @@
     "scripts/build-v4-staging-next.mjs",
     "cloudflare/ui/command-v4.html",
     "scripts/build-v4-ui-next.mjs",
-    "scripts/build-v4-ui-hardened.mjs"
+    "scripts/build-v4-ui-hardened.mjs",
+    "scripts/build-v4-staging-isolation-fix.mjs"
   ],
   "cloudflare_deployed_verified": true,
   "scope": "isolated staging only; no production deployment",
@@ -20,7 +21,7 @@
     "previews_enabled": false,
     "ai_binding": false,
     "production_database_binding": false,
-    "rollback_version": "b27360b9-b467-4770-beeb-bf8f08629a6d"
+    "rollback_version": "6c50ebad-cd5a-48af-b3e2-fbe8a2c66dcf"
   },
-  "source_note": "Read-only staging v4 UI hardening deployed: dynamic task controls disabled, task click guarded, production module links non-navigable. Verified Cloudflare SHA-256 and isolated D1; previous manifest archived."
+  "source_note": "Isolated staging HTTP 502 verifier fix: no-body POST /api/tasks denied with HTTP 404. Worker source read back from Cloudflare and SHA-256 verified; previous deployment archived. Production version unchanged."
 }
