@@ -95,6 +95,16 @@ try{
   const size=await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));
   assert(size.scroll<=size.width+4,'Unexpected horizontal overflow '+JSON.stringify(size));
  }
+ await page.setViewportSize({width:864,height:960});
+ const wideMobileLike=await page.evaluate(()=>({
+   gridColumns:getComputedStyle(document.querySelector('.grid')).gridTemplateColumns,
+   firstPanelWidth:document.querySelector('.grid .panel').getBoundingClientRect().width,
+   viewport:window.innerWidth,
+   pageWidth:document.documentElement.scrollWidth
+ }));
+ assert(wideMobileLike.gridColumns.trim().split(/\s+/).length===1,'Narrow desktop-mode browser must use a single column: '+JSON.stringify(wideMobileLike));
+ assert(wideMobileLike.firstPanelWidth>600,'Panels should use available screen width');
+ assert(wideMobileLike.pageWidth<=wideMobileLike.viewport+4,'No horizontal overflow in desktop-site mode');
  await page.setViewportSize({width:393,height:852});
  const data={
   format:'jarvis-local-data-v1',
