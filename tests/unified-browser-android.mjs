@@ -393,6 +393,28 @@ try{
  assert.equal(writes.length,priorWrites,'Stopping must not write');
  assert.match(await page.locator('#dialogueStatus').textContent(),/terminato/i);
 
+
+ // Reproduce the Redmi voice transcription: the command must start an actual job,
+ // not receive a fabricated advisory answer from read-only AI.
+ const beforeNoisyJobs=siteJobs.length;
+ const beforeNoisyRuns=writes.filter(w=>w.path.endsWith('/run')).length;
+ const beforeNoisyAI=writes.filter(w=>w.path==='/api/ai-chat').length;
+ await page.locator('#chatInput').fill('Hey Jarvis micr è un sito un sito web per un idraulico per piacere');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Ho generato il sito «Sito completato»'),{timeout:15000});
+ await page.waitForFunction(()=>document.querySelector('#siteJobsList button[data-job-id]')?.textContent==='Apri sito',{timeout:15000});
+ assert.equal(siteJobs.length,beforeNoisyJobs+1,'Noisy recognition must create exactly one persistent website job');
+ assert.equal(writes.filter(w=>w.path.endsWith('/run')).length,beforeNoisyRuns+1,'Noisy voice command must execute that job');
+ assert.equal(siteJobs.at(-1).status,'completed','Generated result must be server-confirmed');
+ assert.match(siteJobs.at(-1).brief,/idraulico/i);
+ assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,beforeNoisyAI,'Noisy site command must not fall back to advisory AI');
+ assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0,'No external publishing');
+ // Never turn informational queries into external writes.
+ const afterNoisyJobs=siteJobs.length;
+ await page.locator('#chatInput').fill('Jarvis, quanto costa un sito web per un idraulico?');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation .bubble.jarvis:last-of-type')?.textContent?.includes('Risposta sintetica')||[...document.querySelectorAll('#conversation .bubble.jarvis')].at(-1)?.textContent?.includes('Risposta sintetica'),{timeout:15000});
+ assert.equal(siteJobs.length,afterNoisyJobs,'Question about site costs is not an action request');
  assert.deepEqual(jsErrors,[],'No unhandled JS errors');
  assert.deepEqual(externalNetwork,[],'No external domains were contacted');
  mkdirSync('dist/browser-artifacts',{recursive:true});
