@@ -413,7 +413,7 @@ try{
  const afterNoisyJobs=siteJobs.length;
  await page.locator('#chatInput').fill('Jarvis, quanto costa un sito web per un idraulico?');
  await page.locator('#chatForm button[type=submit]').click();
- await page.waitForFunction(()=>writes.length>0,{timeout:15000});
+ await page.waitForFunction(()=>document.querySelector('#conversation .bubble.jarvis:last-of-type')?.textContent?.includes('Risposta sintetica')||[...document.querySelectorAll('#conversation .bubble.jarvis')].at(-1)?.textContent?.includes('Risposta sintetica'),{timeout:15000});
  assert.equal(siteJobs.length,afterNoisyJobs,'Question about site costs is not an action request');
  assert.deepEqual(jsErrors,[],'No unhandled JS errors');
  assert.deepEqual(externalNetwork,[],'No external domains were contacted');
