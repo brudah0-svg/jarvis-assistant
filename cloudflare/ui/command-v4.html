@@ -287,22 +287,32 @@ $('memoryFile').onchange=async e=>{
  }catch(err){say('Importazione interrotta: '+err.message)}
 };
 let chatRevision=0;
+let chatBusy=false;
 $('chatForm').onsubmit=async e=>{
- e.preventDefault();const message=$('chatInput').value.trim();if(!message)return;
- chatRevision++;
- $('chatInput').value='';say(message,'user');const submit=$('chatForm').querySelector('.send');submit.disabled=true;
+ e.preventDefault();
+ if(STATIC_PREVIEW||chatBusy)return;
+ const message=$('chatInput').value.trim();if(!message)return;
+ chatRevision++;chatBusy=true;
+ $('chatInput').value='';say(message,'user');
+ const submit=$('chatForm').querySelector('.send');submit.disabled=true;
  try{
-  const result=await post('/api/ai-chat',{message});
-  const answer=result.answer||'Il modello non ha restituito una risposta.';
-  say(answer);
-  // Chat persistence is explicit, after the user initiates a message.
-  // Preserve chronological order and report any incomplete persistence.
+  // Persist the user's message before inference: a failed AI request must not lose it.
   try{
    await post('/api/chat-history',{role:'user',content:message});
-   await post('/api/chat-history',{role:'assistant',content:answer});
-  }catch(historyError){say('La risposta AI è disponibile, ma lo storico non è stato salvato completamente: '+historyError.message)}
- }catch(err){say('AI non disponibile: '+err.message)}
- finally{submit.disabled=false}
+  }catch(historyError){
+   $('chatInput').value=message;
+   say('Messaggio non salvato nel cloud; invio AI sospeso per proteggere la cronologia. Riprova: '+historyError.message);
+   return;
+  }
+  try{
+   const result=await post('/api/ai-chat',{message});
+   const answer=result.answer||'Il modello non ha restituito una risposta.';
+   say(answer);
+   try{
+    await post('/api/chat-history',{role:'assistant',content:answer});
+   }catch(historyError){say('La risposta AI è disponibile, ma lo storico non è stato salvato completamente: '+historyError.message)}
+  }catch(err){say('AI non disponibile: '+err.message+' (il messaggio utente è stato salvato).')}
+ }finally{chatBusy=false;submit.disabled=false}
 };
 $('voiceBtn').onclick=()=>{
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
