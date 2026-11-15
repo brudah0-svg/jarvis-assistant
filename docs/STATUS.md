@@ -79,6 +79,14 @@
 - Cloudflare staging runtime 10/10, real authentication smoke, independent encrypted off-account backup, current release candidate provenance and explicit production release approval remain outstanding.
 - ChatGPT monitoring was re-enabled for the existing 6-hour task; it does not automatically perform deployments or data changes.
 
+## Read-only v4 staging UI hardened and deployed (2026-11-15)
+
+- New isolated staging Worker version: `6c50ebad-cd5a-48af-b3e2-fbe8a2c66dcf`; rollback: `b27360b9-b467-4770-beeb-bf8f08629a6d`.
+- Cloudflare source was read back and verified at SHA-256 `15e680cc19d5a19931f27bdd0e93857178175286a94f2e4412f639907464e22f` (330,480 characters), matching green mobile Chromium candidate tests.
+- UI task completion controls disabled in staging after render, click handling guarded, production module links non-navigable.
+- Staging public workers.dev and previews disabled; isolated D1 and VERSION bindings; D1 quick check = ok with one synthetic project and one task. Production unchanged at `89f66668-175c-41ce-926c-b45aceef1f06`.
+- **Release gate remains blocked:** current-version 10/10 remote Cloudflare regression, independent encrypted off-account backup, authenticated physical Android acceptance and approval incomplete.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.

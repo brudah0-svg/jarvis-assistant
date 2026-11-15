@@ -5,9 +5,9 @@ import {resolve} from 'node:path';
 import {randomUUID} from 'node:crypto';
 
 // This is a local synthetic execution of the exact pinned source, NOT a remote Cloudflare run.
-execFileSync(process.execPath,['scripts/build-v4-ui-next.mjs'],{stdio:'inherit'});
-const worker=(await import(pathToFileURL(resolve('dist/jarvis-v4-ui-next.mjs')).href)).default;
-const version='b27360b9-b467-4770-beeb-bf8f08629a6d';
+execFileSync(process.execPath,['scripts/build-v4-ui-hardened.mjs'],{stdio:'inherit'});
+const worker=(await import(pathToFileURL(resolve('dist/jarvis-v4-ui-hardened.mjs')).href)).default;
+const version='6c50ebad-cd5a-48af-b3e2-fbe8a2c66dcf';
 const projects=[{id:'staging-project',name:'Fixture',description:'Synthetic',status:'active'}];
 const tasks=[{id:'staging-task',project_id:'staging-project',title:'Fixture task',status:'pending'}];
 const tables=['projects','tasks','memories'];
