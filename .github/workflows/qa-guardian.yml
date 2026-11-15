@@ -29,6 +29,8 @@ jobs:
           node-version: '22'
       - name: Validate QA Guardian safety and diagnosis
         run: node tests/qa-guardian-contract.mjs
+      - name: Validate autonomous improvement isolation and OIDC claims
+        run: node tests/autoimprove-contract.mjs
       - name: Run full synthetic contract and safety suite
         run: node scripts/qa-guardian.mjs --suite=contracts
       - name: Preserve machine-readable quality report
