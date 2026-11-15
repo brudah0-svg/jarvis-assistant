@@ -491,7 +491,7 @@ function parseJarvisCoreCommand(message){
  }
  // If the transcription clearly asks to build a website but omits a coherent
  // recipient, ask for a better brief rather than inventing a completed action.
- const wantsWebsite=/^(?:mi\s*cre|micr\b|crea(?:mi)?\b|costruisci(?:mi)?\b|fammi\b|realizza\b|sviluppa\b)/i.test(input)&&/\b(?:sito|pagina\s+web|landing\s+page)\b/i.test(input);
+ const wantsWebsite=/^(?:mi\s*cre|micr\b|crea(?:mi)?\b|costruisci(?:mi)?\b|fammi\b|realizza\b|sviluppa\b)/i.test(input)&&/\b(?:sito|pagina\s+web|landing\s+page)\b/i.test(input)
   && !/^.{0,125}\bprogetto\b/i.test(input);
  if(wantsWebsite)return {kind:'website-clarify'};
 
