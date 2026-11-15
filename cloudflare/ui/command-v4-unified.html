@@ -444,7 +444,7 @@ $('chatForm').onsubmit=async e=>{
 $('voiceBtn').onclick=()=>{
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){say('Dettatura non supportata dal browser. Usa la tastiera Android.');return}
- const recognition=new SR();recognition.lang='it-IT';recognition.onresult=e=>{$('chatInput').value=e.results[0][0].transcript};recognition.onerror=()=>say('Errore della dettatura.');recognition.start();
+ const recognition=new SR();recognition.lang='it-IT';recognition.onresult=e=>{const spoken=e.results[0][0].transcript;$('chatInput').value=spoken;if(parseJarvisCoreCommand(spoken)?.kind==='website'){$('chatForm').requestSubmit()}};recognition.onerror=()=>say('Errore della dettatura.');recognition.start();
 };
 
 // User-initiated import, never a background or cross-origin localStorage read.
@@ -554,7 +554,7 @@ $('siteVoice').onclick=()=>{
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){$('siteBuilderStatus').textContent='Riconoscimento vocale non supportato. Puoi scrivere il brief nella casella.';return}
  const rec=new SR();rec.lang='it-IT';rec.maxAlternatives=1;
- rec.onresult=e=>{$('siteBrief').value=e.results[0][0].transcript;$('siteBuilderStatus').textContent='Descrizione riconosciuta. Premi Genera il mio sito.'};
+ rec.onresult=e=>{const transcript=e.results[0][0].transcript;$('siteBrief').value=transcript;if(transcript.trim().length>=15){$('siteBuilderStatus').textContent='Comando vocale riconosciuto. Avvio la generazione…';$('siteBuilderForm').requestSubmit()}else{$('siteBuilderStatus').textContent='Descrizione troppo breve. Aggiungi dettagli e premi Genera il mio sito.'}};
  rec.onerror=()=>{$('siteBuilderStatus').textContent='Dettatura interrotta: usa la tastiera o riprova.'};rec.start();
 };
 
