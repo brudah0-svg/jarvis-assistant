@@ -198,6 +198,7 @@ try{
  assert.equal(writes.length,writesBefore,'Cancelled import must not write anything');
  await upload();
  await page.waitForFunction(()=>document.querySelector('#workspaceImportStatus')?.textContent?.includes('Importazione completata'),{timeout:25000});
+ await page.waitForFunction(()=>document.querySelector('#projectCount')?.textContent==='2'&&document.querySelector('#taskCount')?.textContent==='2',{timeout:15000});
  assert.equal(await page.locator('#projectCount').textContent(),'2');
  assert.equal(await page.locator('#taskCount').textContent(),'2','One of the three imported and existing tasks is complete, so only two remain open');
  assert.equal(projects.length,2);
