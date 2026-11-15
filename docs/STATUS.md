@@ -103,6 +103,15 @@
 - The user independently demonstrated a local Android `.jarvisbak` decryption/integrity check with 35 tables and 96 records. This is evidence of a local off-Cloudflare copy, **not** of an additional off-device copy, nor of a full database restore drill on the latest snapshot.
 - The newest snapshot's `restore_test_verified` flag remains **0**. Independent second copy off the phone and current-version remote 10/10 regression remain outstanding for release readiness.
 
+## Standalone Android encrypted backup verifier (2026-11-15)
+
+- GitHub PR #25 merged: added `backup-verify-offline.html` to the Pages root, a standalone verifier for encrypted `.jarvisbak` files without calling Cloudflare APIs.
+- Browser verifies AES-256-GCM decryption using the user-supplied password, PBKDF2-SHA256 with 310,000 iterations, the plaintext SHA-256, both canonical schema/record SHA-256 digests, snapshot ID, JSON structure, table counts and row counts. Nothing is transmitted or restored; password input is cleared after verification.
+- Static Content Security Policy blocks network requests and external assets. Browser CI passed on synthetic valid, wrong-password, altered ciphertext, mismatched row digest, altered plaintext digest and snapshot identity archives, with zero external requests in mobile-like Chromium. No real backups or secrets enter GitHub.
+- Existing Android screenshot demonstrates a successfully decrypted local backup with 35 tables and 96 rows, but does **not** confirm a second independent off-device copy. The latest snapshot remains untested for full DB restore; external release-gate evidence is incomplete.
+- Pages deployment of the verifier must also be independently confirmed before claiming the live URL is operational.
+- Release gate remains blocked pending current staging remote 10/10, off-device backup confirmation, latest restore proof, authenticated Android release smoke, provenance and explicit authorization.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
