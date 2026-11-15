@@ -1,0 +1,54 @@
+name: JARVIS AutoImprove — isolated AI patches
+
+on:
+  workflow_dispatch:
+    inputs:
+      goal:
+        description: 'Miglioramento richiesto (facoltativo, senza segreti)'
+        required: false
+        type: string
+  schedule:
+    - cron: '43 4 * * *'
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: jarvis-autoimprove-main
+  cancel-in-progress: false
+
+jobs:
+  agent:
+    if: github.repository == 'brudah0-svg/jarvis-assistant' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+      AUTOIMPROVE_GOAL: ${{ inputs.goal || '' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate agent safety contract before any AI request
+        run: node tests/autoimprove-contract.mjs
+      - name: Install synthetic Android browser
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Ask Cloudflare Workers AI for a bounded patch, retry and run all tests
+        run: node scripts/autoimprove-runner.mjs
+      - name: Preserve review-only quality report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-autoimprove-report
+          path: dist/autoimprove/result.json
+          if-no-files-found: warn
+          retention-days: 14
