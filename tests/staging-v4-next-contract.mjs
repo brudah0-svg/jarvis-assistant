@@ -30,6 +30,6 @@ assert.equal((await request('/api/memory','POST',{content:'No writes'})).status,
 assert.equal((await request('/api/ai-chat','POST',{message:'No AI'})).status,405);
 assert.equal((await request('/api/chat-history','POST',{role:'user',content:'No writes'})).status,405);
 assert.equal((await request('/api/recovery/preflight')).status,404);
-const deployed=JSON.parse(readFileSync('cloudflare/STAGING_V4_DEPLOYMENT.json','utf8'));
+const deployed=JSON.parse(readFileSync('cloudflare/STAGING_V4_DEPLOYMENT_PREV.json','utf8'));
 assert.equal(deployed.version_id,'a43a3a07-4e54-4577-a775-3a11db96258e','Old deployment remains pinned');
 console.log('Next staging candidate passed: PATCH 404, all writes blocked, synthetic reads, no privileged routes.');
