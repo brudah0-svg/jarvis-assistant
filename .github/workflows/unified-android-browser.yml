@@ -1,0 +1,39 @@
+name: JARVIS unified Android-like browser acceptance
+on:
+  pull_request:
+    paths:
+      - 'cloudflare/ui/command-v4-unified.html'
+      - 'cloudflare/ui/jarvis-app.webmanifest'
+      - 'scripts/build-v4-unified-production-candidate.mjs'
+      - 'tests/unified-browser-android.mjs'
+      - '.github/workflows/unified-android-browser.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-android-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check source candidate
+        run: node tests/unified-cloud-candidate.mjs
+      - name: Install isolated Chromium dependency
+        run: npm install --no-save --no-audit --no-fund playwright@1.56.1
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Exercise JARVIS unified synthetic Android workflow
+        run: node tests/unified-browser-android.mjs
+      - name: Attach synthetic mobile screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-unified-mobile-synthetic
+          path: dist/browser-artifacts/jarvis-unified-android.png
+          if-no-files-found: ignore
+          retention-days: 5
