@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+
+execFileSync(process.execPath,['scripts/build-v4-staging.mjs'],{stdio:'inherit'});
+const baseline=readFileSync('dist/jarvis-v4-staging.mjs','utf8');
+const deployed=JSON.parse(readFileSync('cloudflare/STAGING_V4_DEPLOYMENT.json','utf8'));
+const sha=s=>createHash('sha256').update(s,'utf8').digest('hex');
+assert.equal(sha(baseline),deployed.source_sha256,'Pinned v4 staging baseline must match deployed version');
+const old="if(path.startsWith('/api/')&&method!=='GET'&&path!=='/api/projects'&&path!=='/api/tasks')return json({error:'Staging: scrittura non consentita'},405,'');";
+const fix="if(method==='PATCH')return json({error:'Staging: endpoint not exposed'},404,'');\n";
+assert.equal(baseline.split(old).length,2,'Patch insertion point must be unique');
+const next=baseline.replace(old,fix+old);
+const candidateSHA='b024e3dfa5e02614a9b689b42f49ac7e93cc1ba73a6c9b21ce6994b320f8eaca';
+assert.equal(next.length,326963);
+assert.equal(sha(next),candidateSHA,'Candidate hash must match separately verified Cloudflare source patch');
+assert(next.includes('const STAGING_ONLY_MODE = true;'));
+writeFileSync('dist/jarvis-v4-staging-next.mjs',next,'utf8');
+console.log('Verified staging PATCH-denial candidate: '+candidateSHA+'. No deployment.');
