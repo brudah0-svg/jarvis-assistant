@@ -1,0 +1,1 @@
+This synthetic test reproduces all four private staging verifier requests on the current pinned staging Worker using only a fake D1. It checks the 5/5 health fixture, API reads, denied empty POST and isolation. It does not prove remote Cloudflare runtime verification, the physical Android browser, or a remote 10/10 regression. No production or personal records are accessed.
