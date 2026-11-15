@@ -112,6 +112,14 @@
 - Pages deployment of the verifier must also be independently confirmed before claiming the live URL is operational.
 - Release gate remains blocked pending current staging remote 10/10, off-device backup confirmation, latest restore proof, authenticated Android release smoke, provenance and explicit authorization.
 
+## Live GitHub Pages backup verifier independently checked (2026-11-15)
+
+- GitHub PR #27 merged. GitHub Actions run `43707045092` completed successfully on `main`: `JARVIS live backup verifier publication`.
+- The hosted backup verifier returned HTTP 200; the downloaded HTML SHA-256 matched `backup-verify-offline.html` from the approved main source byte for byte.
+- The live page check also confirmed local-only Content Security Policy, encrypted backup format marker, and absence of upload network APIs. No real archive or password was transmitted.
+- A `main` push trigger was added because the GitHub-managed Pages workflow had not emitted the previous expected workflow-run trigger. The check retries publication with bounded delays and reports a failure instead of accepting a mismatch.
+- This does not complete the latest backup's isolated restore, an additional off-device copy, physical Android acceptance, or the current staging version's remote 10/10 regression; production release remains **blocked**.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
