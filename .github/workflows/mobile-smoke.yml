@@ -1,0 +1,36 @@
+name: JARVIS Android-like browser smoke
+on:
+  pull_request:
+    paths:
+      - 'cloudflare/ui/command-v4.html'
+      - 'scripts/build-v4-ui-next.mjs'
+      - 'tests/mobile-browser-smoke.mjs'
+      - '.github/workflows/mobile-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-mobile-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated browser test dependency
+        run: npm install --no-save --no-audit --no-fund playwright@1.56.1
+      - name: Install Chromium runtime
+        run: npx playwright install --with-deps chromium
+      - name: Exercise v4 UI in Android-like Chromium
+        run: node tests/mobile-browser-smoke.mjs
+      - name: Attach synthetic UI screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-v4-android-like-screenshot
+          path: dist/browser-artifacts/jarvis-v4-mobile.png
+          if-no-files-found: ignore
+          retention-days: 5
