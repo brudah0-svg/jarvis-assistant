@@ -591,7 +591,7 @@ async function loadSiteJobs(){
    const button=document.createElement('button');
    button.className='small-btn';button.type='button';button.dataset.jobId=job.id;
    button.textContent=job.status==='completed'?'Apri sito':job.status==='running'?'In esecuzione':job.attempt_count>=3?'Tentativi esauriti':'Avvia';
-   button.disabled=job.status==='running'||(job.status!=='completed'&&job.attempt_count>=3)||siteJobsBusy;
+   button.disabled=job.status==='running'||(job.status!=='completed'&&job.attempt_count>=3);
    box.append(button);list.append(box);
   }
   status.textContent=result.jobs.length?'Lavori recuperati: '+result.jobs.length+'. I lavori non vengono eseguiti in background.':'Non ci sono incarichi salvati.';
