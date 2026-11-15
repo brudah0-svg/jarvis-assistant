@@ -55,7 +55,9 @@ const server=createServer(async(req,res)=>{
    if(path==='/api/tasks')return json(res,200,{tasks});
    if(path==='/api/memory')return json(res,200,{memories});
    if(path==='/api/proposals')return json(res,200,{proposals});
-   if(path==='/api/chat-history')return json(res,200,{messages:[]});
+   if(path==='/api/autonomy/status')return json(res,200,{status:'passed',latest:{checks_passed:5,checks_total:5},pending_approvals:[],automatic_publication:false});
+    if(path==='/api/autonomy/remediations')return json(res,200,{status:'ok',cases:[{state:'needs_review',title:'Synthetic QA finding'}],automatic_execution:false});
+    if(path==='/api/chat-history')return json(res,200,{messages:[]});
    return json(res,404,{error:'Route unavailable'});
   }
   if(req.method!=='POST'&&req.method!=='PATCH')return json(res,405,{error:'Method disabled'});
@@ -108,7 +110,9 @@ const server=createServer(async(req,res)=>{
     return json(res,200,{status:'generated',format:'standalone-static-html',html,siteTitle:'Pinco Pallo',saved,draftId,requires_publication_approval:true,production_deployed:false,operations_executed:false});
   }
   if(path==='/api/plan'&&req.method==='POST')return json(res,200,{status:'proposal',goal:body.goal,steps:[{order:1,title:'Preparare il prototipo'},{order:2,title:'Collaudare su Android'}],requires_approval:true,notice:'Bozza sintetica senza scritture'});
-  if(path==='/api/chat-history'&&req.method==='POST')return json(res,201,{status:'created'});
+  if(path==='/api/executor/run'&&req.method==='POST')return json(res,200,{status:'completed',project_id:body.project_id,total_checks:5,passed:4,warnings:1,read_only:true,automatic_fix_applied:false});
+   if(path==='/api/self-improvement/prepare'&&req.method==='POST')return json(res,200,{status:'ok',project_id:body.project_id,automatic_changes:0,generated:1,proposals:[{id:'synthetic-safe-proposal'}]});
+   if(path==='/api/chat-history'&&req.method==='POST')return json(res,201,{status:'created'});
   if(path==='/api/ai-chat'&&req.method==='POST')return json(res,200,{answer:'Risposta sintetica, nessuna AI reale utilizzata.'});
   return json(res,404,{error:'No synthetic route'});
  }catch(e){json(res,500,{error:String(e).slice(0,200)})}
@@ -451,6 +455,21 @@ try{
  await page.locator('#chatForm button[type=submit]').click();
  await page.waitForFunction(()=>document.querySelector('#conversation .bubble.jarvis:last-of-type')?.textContent?.includes('Risposta sintetica')||[...document.querySelectorAll('#conversation .bubble.jarvis')].at(-1)?.textContent?.includes('Risposta sintetica'),{timeout:15000});
  assert.equal(siteJobs.length,afterNoisyJobs,'Question about site costs is not an action request');
+ // The conversational Core AI self-audit must use verified diagnostic APIs, not advisory AI.
+ // It must prepare proposals without changing any user project/task records or deploying code.
+ projects.push({id:'jarvis-core',name:'JARVIS',description:'Synthetic core project',status:'active'});
+ await page.evaluate(async()=>{await loadAll()});
+ const aiBeforeAudit=writes.filter(w=>w.path==='/api/ai-chat').length;
+ const tasksBeforeAudit=tasks.length,projectsBeforeAudit=projects.length;
+ await page.locator('#chatInput').fill('Hey Jarvis, analizzati e proponi come migliorarti');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Ho preparato 1 nuove proposte'),{timeout:15000});
+ assert.equal(writes.filter(w=>w.path==='/api/executor/run').length,1,'Self audit must execute only one diagnostic');
+ assert.equal(writes.filter(w=>w.path==='/api/self-improvement/prepare').length,1,'Self audit must prepare reviewed proposals');
+ assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,aiBeforeAudit,'Self audit cannot be fabricated by an advisory AI response');
+ assert.equal(tasks.length,tasksBeforeAudit,'Self audit cannot modify tasks');
+ assert.equal(projects.length,projectsBeforeAudit,'Self audit cannot modify project records');
+ assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0,'Self audit cannot deploy code');
  assert.deepEqual(jsErrors,[],'No unhandled JS errors');
  assert.deepEqual(externalNetwork,[],'No external domains were contacted');
  mkdirSync('dist/browser-artifacts',{recursive:true});
