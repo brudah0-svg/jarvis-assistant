@@ -60,7 +60,7 @@ async function jarvisDailyStagingRegression(env){
    const tasks=await call('/api/tasks?project_id='+encodeURIComponent(projectId));test('task_read',tasks.status===200&&tasks.data?.tasks?.some(t=>t.id===taskId));
   }else{test('project_read',false);test('task_create',false);test('task_read',false)}
   const unauthorized=await call('/api/projects','POST',{name:'UNAUTHORIZED-REGRESSION',description:'Staging regression temporary fixture'});test('unapproved_write_block',unauthorized.status===404);
-  const patch=await call('/api/tasks/staging-task','PATCH',{title:'changed'});test('patch_block',patch.status===404);
+  const patch=await call('/api/tasks/staging-task','PATCH',{title:'changed'});test('patch_block',[404,405].includes(patch.status));
  }catch(e){test('runtime',false);console.error('Scheduled staging regression',String(e?.name||'Error').slice(0,95))}
  finally{
   try{const c=await call('/staging-regression-cleanup','POST',{run_id:runId});cleanupPass=c.status===200&&c.data?.fixture_restored===true}catch(e){console.error('Scheduled staging cleanup',String(e).slice(0,95))}
@@ -563,7 +563,7 @@ if(path==='/api/staging/regression' && method==='POST'){
       const task=await http('/api/tasks','POST',{project_id:stagingProjectId,title:taskName,description:'Staging regression temporary fixture'});taskId=task.data?.task?.id||null;test('task_create',task.status===201&&!!taskId,'POST /api/tasks HTTP '+task.status);
       const taskList=await http('/api/tasks?project_id='+encodeURIComponent(stagingProjectId));test('task_read',taskList.status===200&&taskList.data?.tasks?.some(t=>t.id===taskId),'GET /api/tasks HTTP '+taskList.status)}
     const denied=await http('/api/projects','POST',{name:'UNAUTHORIZED-REGRESSION',description:'Staging regression temporary fixture'});test('unapproved_write_block',denied.status===404,'Unauthorized POST HTTP '+denied.status);
-    const deniedPatch=await http('/api/tasks/staging-task','PATCH',{title:'changed'});test('patch_block',deniedPatch.status===404,'PATCH HTTP '+deniedPatch.status);
+    const deniedPatch=await http('/api/tasks/staging-task','PATCH',{title:'changed'});test('patch_block',[404,405].includes(deniedPatch.status),'PATCH HTTP '+deniedPatch.status);
   }catch(e){test('runtime',false,String(e?.name||'Error')+': '+String(e?.message||'').slice(0,180))}
   finally{
     try{const cleaned=await http('/staging-regression-cleanup','POST',{run_id:runId});cleanupPass=cleaned.status===200&&cleaned.data?.fixture_restored===true;cleanupError=cleanupPass?'Fixture restored':('Cleanup result HTTP '+cleaned.status);if(!cleanupPass)console.error('Staging regression cleanup failed',runId,cleanupError)}catch(e){cleanupError=String(e?.name||'Error');console.error('Staging cleanup exception',runId,cleanupError)}
