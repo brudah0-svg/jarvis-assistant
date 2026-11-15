@@ -221,6 +221,22 @@ async function loadAll(){
  }catch(e){state.connected=false;notice('Connessione non disponibile: '+e.message,'alert')}
  finally{state.loading=false}
 }
+async function loadChatHistory(){
+ if(STATIC_PREVIEW)return;
+ const revision=chatRevision;
+ try{
+  const result=await api('/api/chat-history');
+  // Never replace messages sent while an asynchronous history request was pending.
+  if(revision!==chatRevision)return;
+  if(!Array.isArray(result?.messages))throw Error('Formato dello storico non valido');
+  const messages=result.messages.filter(m=>m&&['user','assistant'].includes(m.role)&&typeof m.content==='string'&&m.content.trim());
+  if(!messages.length)return;
+  $('conversation').replaceChildren();
+  for(const m of messages)say(m.content,m.role==='user'?'user':'jarvis');
+ }catch(e){
+  if(revision===chatRevision)say('Cronologia cloud non disponibile: '+e.message);
+ }
+}
 $('activeProject').onchange=render;
 $('memorySearch').oninput=render;
 $('addProject').onclick=async()=>{
@@ -270,8 +286,10 @@ $('memoryFile').onchange=async e=>{
   await loadAll();say('Importati '+imported+' ricordi nel Cloud. L’originale sul telefono non è stato eliminato.');
  }catch(err){say('Importazione interrotta: '+err.message)}
 };
+let chatRevision=0;
 $('chatForm').onsubmit=async e=>{
  e.preventDefault();const message=$('chatInput').value.trim();if(!message)return;
+ chatRevision++;
  $('chatInput').value='';say(message,'user');const submit=$('chatForm').querySelector('.send');submit.disabled=true;
  try{
   const result=await post('/api/ai-chat',{message});
@@ -292,6 +310,6 @@ $('voiceBtn').onclick=()=>{
  const recognition=new SR();recognition.lang='it-IT';recognition.onresult=e=>{$('chatInput').value=e.results[0][0].transcript};recognition.onerror=()=>say('Errore della dettatura.');recognition.start();
 };
 function tick(){$('clock').textContent=new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}
-tick();setInterval(tick,30000);loadAll();</script>
+tick();setInterval(tick,30000);loadAll();loadChatHistory();</script>
 </body>
 </html>
