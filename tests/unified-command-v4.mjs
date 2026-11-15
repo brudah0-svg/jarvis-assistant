@@ -5,6 +5,11 @@ import assert from 'node:assert/strict';
 execFileSync(process.execPath,['scripts/build-unified.mjs'],{stdio:'inherit'});
 execFileSync(process.execPath,['--check','dist/jarvis-backend.mjs'],{stdio:'inherit'});
 
+const original=readFileSync('cloudflare/workers/jarvis-backend.mjs','utf8');
+const built=readFileSync('dist/jarvis-backend.mjs','utf8');
+assert(original.includes("test('patch_block',deniedPatch.status===404,'PATCH HTTP '+deniedPatch.status);"),'Immutable source must retain original regression');
+assert(built.includes("test('patch_block',[404,405].includes(deniedPatch.status),'PATCH HTTP '+deniedPatch.status);"),'Candidate regression must support 405 rejection');
+assert(built.includes("test('patch_block',[404,405].includes(patch.status));"),'Scheduled regression must support 405 rejection');
 const module = await import('../dist/jarvis-backend.mjs');
 const fetch=async (path,options={})=>module.default.fetch(new Request('https://jarvis.example'+path,options),{}, {waitUntil:()=>{}});
 const page=await fetch('/command-v4');

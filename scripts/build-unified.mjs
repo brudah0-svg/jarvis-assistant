@@ -22,7 +22,11 @@ assert(!worker.includes("if(path==='/command-v4'"),'Route already exists in sour
 const response = "if(path==='/command-v4' && method==='GET'){if(origin && origin !== ALLOWED_ORIGIN && origin !== url.origin)return json({error:'Origin not allowed'},403);return new Response("+
   JSON.stringify(html)+
   ",{status:200,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'\"}})}";
-const output=worker.replace(anchor,anchor+'\n'+response);
+// Build candidate only: never rewrite a pinned deployed Worker snapshot.
+assert.equal(worker.split("test('patch_block',deniedPatch.status===404,'PATCH HTTP '+deniedPatch.status);").length,2);
+assert.equal(worker.split("test('patch_block',patch.status===404);").length,2);
+const candidate=worker.replace("test('patch_block',deniedPatch.status===404,'PATCH HTTP '+deniedPatch.status);","test('patch_block',[404,405].includes(deniedPatch.status),'PATCH HTTP '+deniedPatch.status);").replace("test('patch_block',patch.status===404);","test('patch_block',[404,405].includes(patch.status));");
+const output=candidate.replace(anchor,anchor+'\n'+response);
 assert(output.includes('/command-v4'));
 mkdirSync('dist',{recursive:true});
 writeFileSync('dist/jarvis-backend.mjs',output);
