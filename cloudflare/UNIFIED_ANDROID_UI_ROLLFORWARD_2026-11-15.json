@@ -1,0 +1,30 @@
+{
+  "version_id": "e346679f-6295-441b-bf4e-1c6848891d97",
+  "worker": "jarvis-backend",
+  "code_sha256": "87a659e41fea55926aa8f165a8608df11523f4467479f52470196406557e6b57",
+  "source_chars": 372823,
+  "previous_version_id": "712920ae-5f79-4ac9-88f5-eaa15a871a66",
+  "route": "/jarvis-unified",
+  "scope": "UI-only change to existing authorized protected route",
+  "features": [
+    "Single-column Android desktop-style viewport <=980px",
+    "Larger touch controls and readable content",
+    "Visible message clarifying AI plans are not human approvals"
+  ],
+  "tested": {
+    "github_browser_mobile_run": 43721663998,
+    "github_source_safety_run": 43721664023,
+    "github_pull_request": 39,
+    "cloudflare_deployment_sha_verified": true,
+    "cloudflare_access_retained": true,
+    "db_sqlite_quick_check": "ok",
+    "production_projects": 2,
+    "production_tasks": 20,
+    "staging_worker_unchanged": true
+  },
+  "data_migration_performed": false,
+  "legacy_route_preserved": true,
+  "production_data_changed": false,
+  "physical_android_post_fix_verified": false,
+  "full_autonomous_features_certified": false
+}
