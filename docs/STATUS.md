@@ -63,6 +63,14 @@
 - Staging D1 integrity `ok`, one project and one task; only isolated D1 `DB` and `VERSION` bindings, public workers.dev and previews off. Production Worker unchanged.
 - The remote current-version 10/10 regression, Android browser acceptance, independent external encrypted backup and formal release candidate verification remain **unverified**; keep release gate closed.
 
+## Full synthetic 10-check staging regression (2026-11-15)
+
+- GitHub PR #19 merged after GitHub Actions passed a new offline synthetic regression against the current pinned staging UI Worker source.
+- **Result: 10/10 passed** locally, including fixture creation/read, forbidden POST and PATCH rejection, fixture cleanup and stable version. The synthetic D1 baseline was restored to 1 project/1 task.
+- This is **not** a Cloudflare runtime regression and must not be entered into production D1 as such. Cloudflare's latest recorded runtime regression remains the historical failed 9/10 run for previous staging version `a43a3a07-4e54-4577-a775-3a11db96258e`.
+- Current deployed staging is `b27360b9-b467-4770-beeb-bf8f08629a6d`, verified at SHA-256 `9b12762d54cb53ae883a1ee1d0525a454012c646c05af69be0b3f24883fe7c6a`. An authenticated remote regression on this exact version remains required.
+- Production remains unchanged and the release gate is blocked pending remote verification, off-account encrypted backup, Android acceptance and approval.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
