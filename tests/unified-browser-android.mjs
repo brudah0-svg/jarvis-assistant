@@ -387,6 +387,42 @@ try{
  await page.waitForFunction(()=>window.__jarvisSpoken?.some(x=>x.includes('Ho creato il sito multipagina')),{timeout:15000});
  await page.waitForFunction(()=>window.__jarvisRecognitionInstances?.length>=4,{timeout:15000});
  assert.equal(writes.filter(w=>w.path==='/api/site-projects').length,multiBefore+1,'Voice creates project without a builder click');
+ // Voice-first execution: project write must wait for an explicit spoken yes.
+ // A spoken no cancels without opening a native Android confirmation dialog.
+ const projectWritesBeforeVoice=writes.filter(w=>w.path==='/api/projects').length;
+ const nativeDialogsBeforeVoice=dialogs.length;
+ const voiceProjectName='Officina prova vocale';
+ const speakIntoActiveDialogue=async phrase=>{
+  const previous=await page.evaluate(()=>window.__jarvisRecognitionInstances.length);
+  await page.evaluate(text=>window.__jarvisRecognitionInstances.at(-1).onresult?.({results:[[{transcript:text}]]}),phrase);
+  await page.waitForFunction(previous=>window.__jarvisRecognitionInstances.length>previous,previous,{timeout:15000});
+ };
+ await speakIntoActiveDialogue('Jarvis, crea progetto: '+voiceProjectName);
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Sto per creare il progetto «Officina prova vocale»'),{timeout:15000});
+ assert.equal(writes.filter(w=>w.path==='/api/projects').length,projectWritesBeforeVoice,'Voice proposal must not write before confirmation');
+ assert.equal(dialogs.length,nativeDialogsBeforeVoice,'Voice proposal must not open a native confirm dialog');
+ await speakIntoActiveDialogue('No, annulla');
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Operazione annullata'),{timeout:15000});
+ assert.equal(writes.filter(w=>w.path==='/api/projects').length,projectWritesBeforeVoice,'Voice cancel is read-only');
+ await speakIntoActiveDialogue('Jarvis, crea progetto: '+voiceProjectName);
+ await speakIntoActiveDialogue('Sì, confermo');
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Progetto “Officina prova vocale” creato'),{timeout:15000});
+ assert.equal(projects.filter(p=>p.name===voiceProjectName).length,1,'New project must exist in the synthetic Cloud');
+ assert.equal(writes.filter(w=>w.path==='/api/projects').length,projectWritesBeforeVoice+1,'One spoken yes authorizes exactly one project creation');
+ assert.equal(dialogs.length,nativeDialogsBeforeVoice,'Voice confirmation must not require touching the screen');
+ // Cancellation must remain safe when speaking a short follow-up.
+ const taskWritesBeforeVoice=writes.filter(w=>w.path==='/api/tasks').length;
+ await page.locator('#activeProject').selectOption({label:voiceProjectName});
+ await speakIntoActiveDialogue('Aggiungi attività: Verifica vocale');
+ assert.equal(writes.filter(w=>w.path==='/api/tasks').length,taskWritesBeforeVoice,'Task must wait for spoken yes');
+ await speakIntoActiveDialogue('No, annulla');
+ assert.equal(writes.filter(w=>w.path==='/api/tasks').length,taskWritesBeforeVoice,'Spoken task cancel must not write');
+ await speakIntoActiveDialogue('Aggiungi attività: Verifica vocale');
+ await speakIntoActiveDialogue('Sì, confermo');
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Attività “Verifica vocale” creata'),{timeout:15000});
+ assert.equal(tasks.filter(t=>t.title==='Verifica vocale').length,1,'New task must exist in the synthetic Cloud');
+ assert.equal(writes.filter(w=>w.path==='/api/tasks').length,taskWritesBeforeVoice+1,'Spoken yes must create exactly one task');
+ assert.equal(dialogs.length,nativeDialogsBeforeVoice,'Voice task creation must remain entirely hands-free');
  const priorWrites=writes.length;
  await page.locator('#dialogueBtn').click();
  assert.equal(await page.locator('#dialogueBtn').getAttribute('aria-pressed'),'false');
