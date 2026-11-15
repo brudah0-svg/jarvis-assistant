@@ -1,0 +1,43 @@
+{
+  "schema": "jarvis-unified-deployment-provenance-v1",
+  "recorded_on": "2026-11-15",
+  "deployment_status": "active_additive_protected_route",
+  "production_worker": "jarvis-backend",
+  "production_version_id": "712920ae-5f79-4ac9-88f5-eaa15a871a66",
+  "source_sha256": "a0a9784bd3bc1889173b09f5da9796094abc9a3f7cd6251cfe3d84e41573d3b4",
+  "source_chars": 371679,
+  "previous_production_version_id": "89f66668-175c-41ce-926c-b45aceef1f06",
+  "previous_source_sha256": "15f9b6ca957c2999208efd65ce5918e9579bc7d6006faf2035410d796acfee17",
+  "candidate_source_repo_commit": "f840361413de9fd84e187b54c7559b6af653c4bb",
+  "candidate_build": "scripts/build-v4-unified-production-candidate.mjs",
+  "candidate_ui": "cloudflare/ui/command-v4-unified.html",
+  "candidate_mobile_acceptance": "github-actions/43718783379",
+  "published_route": "/jarvis-unified",
+  "manifest_route": "/jarvis-app.webmanifest",
+  "original_route_preserved": "/jarvis",
+  "staging_version_preserved": "80077801-2762-4ed3-8581-42b806032c4a",
+  "security": {
+    "cloudflare_access_self_hosted": true,
+    "original_bindings_preserved_count": 7,
+    "all_secrets_preserved": true,
+    "prod_d1_integrity": "ok",
+    "prod_projects_after": 2,
+    "prod_tasks_after": 20,
+    "staging_d1_integrity": "ok",
+    "staging_projects_after": 1,
+    "staging_tasks_after": 1,
+    "database_mutations_during_deploy": false,
+    "automatic_migration": false,
+    "old_app_redirected": false,
+    "full_physical_android_functional_acceptance": false
+  },
+  "user_approval": "Explicit authorization given in conversation for protected additive release, existing version and data retained",
+  "operational_scope": "Add only GET /jarvis-unified and GET /jarvis-app.webmanifest. No new integration or auto-migration route.",
+  "rollback": "Deploy previous Worker version 89f66668-175c-41ce-926c-b45aceef1f06 at 100 percent if urgent, after verifying version remains available and preserving security/bindings. This removes new route only; no data migration performed.",
+  "remaining": [
+    "User physical Android authenticated smoke test",
+    "Current 101-row off-device encrypted backup verification before migration",
+    "Review JARVIS chat AI behavior and Android installability",
+    "Avoid marking whole project feature complete solely from deploy"
+  ]
+}
