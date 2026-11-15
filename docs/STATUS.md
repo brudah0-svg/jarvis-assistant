@@ -28,6 +28,15 @@
 - A staging regression of 10/10 passed for a previous staging version. **It must be rerun for any new staging version before release.**
 - Backup and autonomy scheduled jobs are configured for every six hours.
 
+## Cloud v4 chat hardening (2026-11-15)
+
+- GitHub PR #13 merged after passing GitHub Actions source safety tests.
+- The v4 source now loads up to the backend's last 60 chat-history records on opening, rendering role-filtered text without raw HTML.
+- A revision guard protects new unsent/live conversation content from a late history response, and simultaneous chat submissions are blocked.
+- User messages are persisted before AI inference; if user-message persistence fails, inference is suspended and the input is restored. A failed AI request cannot remove the already saved user message.
+- The integration is **source code only**, not the deployed production Worker nor an end-to-end browser or remote integration verification.
+- The staging snapshot remains pinned to the previously deployed version; no silent staging or production update was performed.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
