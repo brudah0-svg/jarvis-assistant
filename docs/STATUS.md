@@ -145,6 +145,16 @@
 - Staging bindings remain only isolated D1 and version metadata; public Worker subdomain/previews disabled; D1 `PRAGMA quick_check=ok` and 1 synthetic project/1 task. Production version unchanged at `89f66668-175c-41ce-926c-b45aceef1f06`.
 - Previous staging `6c50ebad-cd5a-48af-b3e2-fbe8a2c66dcf` retained as rollback. Authenticated browser retest of `/api/staging/verify` has **not yet been witnessed**, nor a full current-version runtime 10/10 regression. Release remains blocked.
 
+## Verified live private staging regression — 2026-11-15 12:51 UTC
+
+- User supplied Android screenshots confirming authenticated private Worker-to-Worker verification passed with no changes, and the real staging API regression returned **10/10 with fixture cleanup complete**.
+- Independently confirmed in production D1 `staging_regression_runs`: run `cda29b08-c813-42fb-8d45-1675407cdf48`, `status=passed`, `tests_passed=10`, `tests_total=10`, `cleanup_passed=1`, `staging_version_id=80077801-2762-4ed3-8581-42b806032c4a`, timestamp `2026-11-15 12:51:54 UTC`. All ten saved check records passed.
+- Direct Cloudflare deployment lookup showed the **same** staging version still active and production unchanged at `89f66668-175c-41ce-926c-b45aceef1f06`. Isolated staging D1 `quick_check=ok`, 1 project, 1 task.
+- The screenshots' Release Gate status was checked **before** the successful new regression, so it displayed historical 9/10 and no matching candidate. The latest matching 10/10 resolves that particular gating fact, **not** the separate release prerequisites or the old backup/provenance flags.
+- Latest archived backup is now **35 tables, 101 rows**, snapshot `ce2ac51a-6d8e-47c0-8951-919031e15251`, created 2026-11-15 12:00:13 UTC. Read-only verification recomputed schema and row SHA-256 exactly and verified per-table counts, record JSON and snapshot consistency.
+- The previously proven isolated SQL restoration concerned the earlier 35-table/**96-row** snapshot, not this new 101-row snapshot. The latest snapshot's `restore_test_verified` remains false. Earlier Android encrypted file verification also concerned 96 rows. Do **not** claim fresh off-device verification or restoration for 101 rows without actual proof.
+- Release remains **blocked** until fresh candidate provenance and recovery evidence, physical Android functional acceptance and explicit human authorization. Do not change production merely to satisfy audit flags.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
