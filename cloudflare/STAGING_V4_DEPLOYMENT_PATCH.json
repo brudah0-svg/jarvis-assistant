@@ -1,0 +1,23 @@
+{
+  "format": "jarvis-staging-v4-deployed-source-v1",
+  "worker": "jarvis-staging",
+  "version_id": "9da6659c-9f2e-4d18-a1c1-66f602cc2861",
+  "source_sha256": "b024e3dfa5e02614a9b689b42f49ac7e93cc1ba73a6c9b21ce6994b320f8eaca",
+  "source_chars": 326963,
+  "built_from": [
+    "cloudflare/workers/jarvis-staging.mjs",
+    "cloudflare/ui/command-v4-staging-snapshot.html",
+    "scripts/build-v4-staging.mjs",
+    "scripts/build-v4-staging-next.mjs"
+  ],
+  "cloudflare_deployed_verified": true,
+  "scope": "isolated staging only; no production deployment",
+  "security": {
+    "workers_dev": false,
+    "previews_enabled": false,
+    "ai_binding": false,
+    "production_database_binding": false,
+    "rollback_version": "a43a3a07-4e54-4577-a775-3a11db96258e"
+  },
+  "source_note": "Cloudflare isolated staging v4 patched to reject PATCH with HTTP 404; current deployed version verified by SHA-256. Original staging HTML and Worker snapshots remain pinned; previous deployment manifest archived."
+}

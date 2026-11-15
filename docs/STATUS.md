@@ -55,6 +55,14 @@
 - Static candidate CI was green prior to upload. The live 10/10 regression has **not** yet been observed on this new version; the prior 9/10 run remains historical.
 - Release gate remains **blocked**, pending fresh live regression, independent encrypted off-account backup, Android acceptance, provenance manifest for the production candidate and explicit approval for production release.
 
+## Latest Cloud v4 UI deployed to isolated staging (2026-11-15)
+
+- **Current staging Worker:** `b27360b9-b467-4770-beeb-bf8f08629a6d`; previous rollback `9da6659c-9f2e-4d18-a1c1-66f602cc2861`.
+- The staged UI now contains the current chat history hydration and user-first durable chat flow. All write controls are disabled in staging, with a synthetic empty history API response and no live AI binding.
+- Independently verified the deployed source hash against GitHub candidate: `9b12762d54cb53ae883a1ee1d0525a454012c646c05af69be0b3f24883fe7c6a` (330,067 characters).
+- Staging D1 integrity `ok`, one project and one task; only isolated D1 `DB` and `VERSION` bindings, public workers.dev and previews off. Production Worker unchanged.
+- The remote current-version 10/10 regression, Android browser acceptance, independent external encrypted backup and formal release candidate verification remain **unverified**; keep release gate closed.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
