@@ -94,6 +94,15 @@
 - Cloudflare cron configured as `0 */6 * * *`. The daily regression is **not** automatically run by the GitHub tests; current remote 10/10 evidence is not yet present.
 - Production remains pinned; the release gate remains blocked until current-version remote runtime result, independent encrypted external backup, authenticated Android acceptance, provenance and human authorization.
 
+## Latest backup read-back integrity audit (2026-11-15)
+
+- Re-read the newest verified private backup snapshot through the Cloudflare D1 API in **read-only** mode; snapshot created at `2026-11-15 06:00:14 UTC`.
+- Verified **35 tables, 96 stored rows** and valid JSON records. Recomputed the full SHA-256 schema and rows digests from the archived records; **both matched** the saved metadata.
+- Verified stored row counts for **all 35 tables**, including **six empty tables** (zero-row tables must be counted as zero, not treated as missing).
+- Neither snapshot contents nor credentials were put into this repository or displayed to the user. No D1 writes or restores were performed.
+- The user independently demonstrated a local Android `.jarvisbak` decryption/integrity check with 35 tables and 96 records. This is evidence of a local off-Cloudflare copy, **not** of an additional off-device copy, nor of a full database restore drill on the latest snapshot.
+- The newest snapshot's `restore_test_verified` flag remains **0**. Independent second copy off the phone and current-version remote 10/10 regression remain outstanding for release readiness.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
