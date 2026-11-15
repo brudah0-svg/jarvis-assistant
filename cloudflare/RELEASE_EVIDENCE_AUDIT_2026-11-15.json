@@ -1,0 +1,58 @@
+{
+  "format": "jarvis-v4-release-evidence-audit-v1",
+  "evidence_date": "2026-11-15",
+  "environment": "Cloudflare production and isolated staging read-only verification; ephemeral restore DB created and deleted",
+  "production": {
+    "version_id": "89f66668-175c-41ce-926c-b45aceef1f06",
+    "source_sha256": "15f9b6ca957c2999208efd65ce5918e9579bc7d6006faf2035410d796acfee17",
+    "source_chars": 334931,
+    "changed": false
+  },
+  "staging": {
+    "version_id": "80077801-2762-4ed3-8581-42b806032c4a",
+    "source_sha256": "b845663d63775b34d681bf7294287117b7915fa61f0b88722383e7d07c2b5f0a",
+    "source_chars": 330634,
+    "isolated": true
+  },
+  "runtime_regression": {
+    "run_id": "cda29b08-c813-42fb-8d45-1675407cdf48",
+    "at_utc": "2026-11-15 12:51:54",
+    "passed": 10,
+    "total": 10,
+    "cleanup_passed": true,
+    "staging_version_id": "80077801-2762-4ed3-8581-42b806032c4a"
+  },
+  "backup": {
+    "snapshot_id": "ce2ac51a-6d8e-47c0-8951-919031e15251",
+    "created_at_utc": "2026-11-15 12:00:13",
+    "tables": 35,
+    "rows": 101,
+    "sha256_schema_verified": true,
+    "sha256_rows_verified": true,
+    "isolated_restore": {
+      "passed": true,
+      "full_row_readback": true,
+      "tables": 35,
+      "rows": 101,
+      "sqlite_quick_check": "ok",
+      "foreign_key_violations": 0,
+      "temporary_db_deleted": true,
+      "production_modified": false
+    },
+    "archived_restore_test_flag_updated": false
+  },
+  "off_device_copy": {
+    "user_confirmed_copy": true,
+    "latest_snapshot_101_rows_verified": false,
+    "latest_off_device_bytes_verified": false
+  },
+  "android": {
+    "private_infrastructure_test_screenshots": true,
+    "complete_production_candidate_acceptance": false
+  },
+  "release": {
+    "candidate_approval": false,
+    "production_deployed": false,
+    "blocked": true
+  }
+}
