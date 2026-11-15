@@ -257,14 +257,14 @@ try{
  await page.waitForFunction(()=>document.querySelector('#siteJobsList button[data-job-id]'),{timeout:15000});
  assert.equal(siteJobs.length,queuedBefore+2);
  assert.equal(siteJobs.at(-1).status,'queued');
- await page.locator('#siteJobsList button[data-job-id]').click();
+ await page.locator('#siteJobsList button[data-job-id]').last().click();
  await page.waitForFunction(()=>document.querySelector('#siteJobsStatus')?.textContent?.includes('Sito completato e salvato'),{timeout:15000});
  assert.equal(siteJobs.at(-1).status,'completed');
  assert.equal(savedDrafts.length,3);
  assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0);
  await page.reload({waitUntil:'networkidle'});
  await page.waitForFunction(()=>document.querySelector('#siteJobsList button[data-job-id]')?.textContent==='Apri sito',{timeout:15000});
- await page.locator('#siteJobsList button[data-job-id]').click();
+ await page.locator('#siteJobsList button[data-job-id]').last().click();
  await page.waitForFunction(()=>document.querySelector('#siteBuilderStatus')?.textContent?.includes('Sito recuperato dall’incarico'),{timeout:15000});
  assert.equal(await page.locator('#siteDownload').isEnabled(),true);
  assert((await page.locator('#sitePreview').getAttribute('srcdoc')).includes('Sito generato e salvato'));
