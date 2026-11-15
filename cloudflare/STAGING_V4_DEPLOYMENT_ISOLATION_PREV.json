@@ -1,0 +1,26 @@
+{
+  "format": "jarvis-staging-v4-deployed-source-v1",
+  "worker": "jarvis-staging",
+  "version_id": "6c50ebad-cd5a-48af-b3e2-fbe8a2c66dcf",
+  "source_sha256": "15e680cc19d5a19931f27bdd0e93857178175286a94f2e4412f639907464e22f",
+  "source_chars": 330480,
+  "built_from": [
+    "cloudflare/workers/jarvis-staging.mjs",
+    "cloudflare/ui/command-v4-staging-snapshot.html",
+    "scripts/build-v4-staging.mjs",
+    "scripts/build-v4-staging-next.mjs",
+    "cloudflare/ui/command-v4.html",
+    "scripts/build-v4-ui-next.mjs",
+    "scripts/build-v4-ui-hardened.mjs"
+  ],
+  "cloudflare_deployed_verified": true,
+  "scope": "isolated staging only; no production deployment",
+  "security": {
+    "workers_dev": false,
+    "previews_enabled": false,
+    "ai_binding": false,
+    "production_database_binding": false,
+    "rollback_version": "b27360b9-b467-4770-beeb-bf8f08629a6d"
+  },
+  "source_note": "Read-only staging v4 UI hardening deployed: dynamic task controls disabled, task click guarded, production module links non-navigable. Verified Cloudflare SHA-256 and isolated D1; previous manifest archived."
+}
