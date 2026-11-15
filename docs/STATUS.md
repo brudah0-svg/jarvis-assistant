@@ -241,6 +241,14 @@ Cost target: use existing free-tier services where practical, without claiming t
 - Evidence: [SITE_DRAFTS_RELEASE_2026-11-15.md](SITE_DRAFTS_RELEASE_2026-11-15.md). A new encrypted independent off-device backup including the new table remains to be verified.
 - This is forward progress on the core product, but **not** proof that full voice-to-autonomous-public-website workflows, persistent agent orchestration and self-upgrades are complete.
 
+## New operational delivery: persisted site jobs and tap-to-talk (2026-11-15)
+
+- PR #49: durable `site_jobs` D1 queue, claim lease, three bounded attempts, authenticated manual `/run`, idempotent generated draft storage and Android reload/reopen. Worker `4b344963-6ff7-4162-8b55-77784e6eed40` passed synthetic CI and post-deploy code SHA verification.
+- PR #50: browser-native Italian tap-to-talk input and spoken assistant output; its browser CI passed. Current Worker `32cb1cc1-35d9-4478-9867-14851ea6d41d` SHA `e48b36cc889184532578e5d78771061e8f6fbe3da7cd3ef310850d81d2b9e51a` read back and confirmed. Prior Worker `4b344963-6ff7-4162-8b55-77784e6eed40` remains available to restore the previous UI.
+- Access protection and all seven bindings preserved. D1 `quick_check=ok`, 2 projects, 20 tasks, zero new jobs and drafts immediately after rollout; staging unchanged.
+- Still **not full JARVIS**: no background agent scheduler, no public site publication, no screen-off hotword, no self-upgrading engine. Latest physical Android with real AI and voice is not yet independently exercised.
+- See [JARVIS_SITE_JOBS_AND_VOICE_RELEASE_2026-11-15.md](JARVIS_SITE_JOBS_AND_VOICE_RELEASE_2026-11-15.md).
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
