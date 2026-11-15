@@ -1,0 +1,72 @@
+name: JARVIS QA Guardian — autonomous regression checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jarvis-qa-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
+
+jobs:
+  guardian-contracts:
+    name: QA Guardian / core and security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Check out JARVIS repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate QA Guardian safety and diagnosis
+        run: node tests/qa-guardian-contract.mjs
+      - name: Run full synthetic contract and safety suite
+        run: node scripts/qa-guardian.mjs --suite=contracts
+      - name: Preserve machine-readable quality report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-qa-guardian-contracts
+          path: |
+            dist/qa/contracts.json
+            dist/qa/contracts.md
+          if-no-files-found: warn
+          retention-days: 14
+
+  guardian-android:
+    name: QA Guardian / simulated Android voice and workflows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out JARVIS repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned browser test dependency
+        run: npm install --no-save --no-audit --no-fund playwright@1.56.1
+      - name: Install synthetic Chromium browser
+        run: npx playwright install --with-deps chromium
+      - name: Simulate Android browser and voice confirmation dialogs
+        run: node scripts/qa-guardian.mjs --suite=android
+      - name: Preserve quality report and synthetic screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-qa-guardian-android
+          path: |
+            dist/qa/android.json
+            dist/qa/android.md
+            dist/browser-artifacts/jarvis-unified-android.png
+          if-no-files-found: warn
+          retention-days: 14
