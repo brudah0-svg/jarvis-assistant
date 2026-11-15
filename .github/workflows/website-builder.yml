@@ -8,6 +8,9 @@ on:
       - 'scripts/build-website-builder-candidate.mjs'
       - 'tests/website-builder-contract.mjs'
       - 'tests/website-drafts-contract.mjs'
+      - 'tests/site-jobs-contract.mjs'
+      - 'cloudflare/workers/site-jobs-route.inc'
+      - 'cloudflare/migrations/20261115_site_jobs.sql'
       - 'cloudflare/migrations/20261115_site_drafts.sql'
       - '.github/workflows/website-builder.yml'
   workflow_dispatch:
@@ -25,4 +28,4 @@ jobs:
         with:
           node-version: '22'
       - name: Validate Website Builder Worker candidate
-        run: node tests/website-builder-contract.mjs && node tests/website-drafts-contract.mjs
+        run: node tests/website-builder-contract.mjs && node tests/website-drafts-contract.mjs && node tests/site-jobs-contract.mjs
