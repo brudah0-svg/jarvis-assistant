@@ -155,6 +155,16 @@
 - The previously proven isolated SQL restoration concerned the earlier 35-table/**96-row** snapshot, not this new 101-row snapshot. The latest snapshot's `restore_test_verified` remains false. Earlier Android encrypted file verification also concerned 96 rows. Do **not** claim fresh off-device verification or restoration for 101 rows without actual proof.
 - Release remains **blocked** until fresh candidate provenance and recovery evidence, physical Android functional acceptance and explicit human authorization. Do not change production merely to satisfy audit flags.
 
+## Verified latest 101-record restore and release evidence (2026-11-15)
+
+- The currently latest internal snapshot at verification time is `ce2ac51a-6d8e-47c0-8951-919031e15251` (**35 tables, 101 records**).
+- A **real SQL-level isolated Cloudflare D1 restore** recreated 35/35 application tables and restored 101/101 rows. SHA-256s matched; `PRAGMA quick_check = ok`; foreign-key violations = 0; all row contents matched on read-back. Temporary EU database was deleted and its absence re-verified.
+- Production unchanged; current production Worker SHA-256 `15f9b6ca957c2999208efd65ce5918e9579bc7d6006faf2035410d796acfee17`; staging SHA-256 `b845663d63775b34d681bf7294287117b7915fa61f0b88722383e7d07c2b5f0a`, both independently read back from deployed Cloudflare Worker versions.
+- Real current-version staging regression `cda29b08-c813-42fb-8d45-1675407cdf48` passed **10/10** with successful cleanup.
+- Evidence report: [LATEST_BACKUP_RESTORE_DRILL_101_2026-11-15.md](LATEST_BACKUP_RESTORE_DRILL_101_2026-11-15.md). Metadata-only machine-readable audit: `cloudflare/RELEASE_EVIDENCE_AUDIT_2026-11-15.json`.
+- The old cloud audit flag `restore_test_verified=0` was deliberately not changed; the newly executed test is recorded here as an independent proof. Prior encrypted off-device Android copy was for the earlier 96-row snapshot, **not verified for the new 101-row snapshot**.
+- Full functional authenticated Android app acceptance and explicit release approval remain necessary. Keep production release gate **blocked**; do not treat this audit as permission to publish.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
