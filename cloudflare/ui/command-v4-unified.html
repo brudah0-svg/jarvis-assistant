@@ -185,7 +185,7 @@ button{color:#d0edff}
           <div class="panel-head"><div><p class="eyebrow">INTERFACCIA</p><h2>Parla con JARVIS</h2></div><span class="tag">AI CLOUD</span></div>
           <div id="conversation" class="conversation"><div class="bubble jarvis">Sì, signore. Sono collegato al centro di comando Cloud. Le operazioni importanti richiedono la tua approvazione.</div></div>
           <form id="chatForm" class="chat-form"><input id="chatInput" autocomplete="off" placeholder="Scrivi un comando o una nota…" aria-label="Messaggio per JARVIS"><button class="send" type="submit">INVIA</button><button id="voiceBtn" class="voice" type="button" title="Dettatura vocale">🎙</button><button id="voiceOutputBtn" class="voice" type="button" aria-pressed="false" title="Attiva le risposte vocali">🔇 Voce OFF</button></form>
-          <p class="hint" id="aiApprovalNotice">Comandi: «Crea progetto: Nome», «Aggiungi attività: Titolo» e «Pianifica: Obiettivo» (con conferma prima della scrittura). La chat AI può proporre piani, ma non può dichiararli approvati: verifica sempre le richieste nel Centro approvazioni. Nessun acquisto, invio o modifica viene eseguito dalla sola risposta della chat. La conversazione vocale richiede il tocco sul microfono e un browser Android compatibile; non è ancora un assistente a schermo spento.</p>
+          <p class="hint" id="aiApprovalNotice">Parlami normalmente: «Hey Jarvis, creami un sito web per Pinco Pallo», «Crea progetto: Nome», «Aggiungi attività: Titolo» oppure «Pianifica: Obiettivo». La creazione dei siti avvia automaticamente un incarico recuperabile nel Cloud; i progetti e le attività richiedono conferma. La chat AI può proporre piani, ma non può dichiararli approvati: verifica sempre le richieste nel Centro approvazioni. Nessun acquisto, invio o modifica viene eseguito dalla sola risposta della chat. La conversazione vocale richiede il tocco sul microfono e un browser Android compatibile; non è ancora un assistente a schermo spento.</p>
         </article>
       </section>
       <footer>JARVIS v4 · Cloud Command Center · Azioni importanti soggette ad approvazione</footer>
@@ -384,22 +384,55 @@ let chatBusy=false;
 // Core command execution: explicit, user-initiated and reversible. Never invoke AI for a write.
 function parseJarvisCoreCommand(message){
  const input=String(message||'').replace(/^(?:ehi|hey)\s+jarvis[\s,:-]*/i,'').trim();
- const website=input.match(/^(?:crea|creami|costruisci|realizza)\s+(?:(?:un|il)\s+)?(?:sito\s*(?:web)?|landing\s*page)\s*(?:per\s+|[:\-]\s*|di\s+)(.+)$/i);
+ // Safe, deterministic routing: never let a free-form AI answer authorize a write.
+ const website=input.match(/^(?:(?:puoi|potresti)\s+)?(?:crea|creami|costruisci|costruiscimi|realizza|fammi|sviluppa|preparami)\s+(?:(?:un|il)\s+)?(?:sito\s*(?:web)?|landing\s*page)\s*(?:per\s+|[:\-]\s*|di\s+)(.+)$/i)
+  ||input.match(/^vorrei\s+che\s+mi\s+(?:creassi|facessi)\s+(?:(?:un|il)\s+)?(?:sito\s*(?:web)?|landing\s*page)\s+per\s+(.+)$/i);
  if(website)return {kind:'website',title:website[1].trim()};
  const project=input.match(/^(?:crea|creami|avvia)\s+(?:(?:un|il)\s+)?(?:nuovo\s+)?progetto\s*[:\-]?\s+(.+)$/i);
  if(project)return {kind:'project',title:project[1].trim()};
  const task=input.match(/^(?:aggiungi|crea|creami)\s+(?:(?:una|un)\s+)?(?:nuova\s+)?(?:attivit[àa]|task)\s*[:\-]?\s+(.+)$/i);
  if(task)return {kind:'task',title:task[1].trim()};
- const planning=input.match(/^(?:pianifica|prepara (?:un )?piano per|organizza)s*[:\-]?\s+(.+)$/i);
+ const planning=input.match(/^(?:pianifica|prepara (?:un )?piano per|organizza)\s*[:\-]?\s+(.+)$/i);
  if(planning)return {kind:'plan',title:planning[1].trim()};
  return null;
+}
+function showSitePreviewInChat(site){
+ // Render generated HTML in an isolated, non-executable iframe, not in the chat DOM.
+ const frame=document.createElement('iframe');
+ frame.title='Anteprima privata: '+String(site.name).slice(0,80);
+ frame.setAttribute('sandbox','');
+ frame.setAttribute('referrerpolicy','no-referrer');
+ frame.setAttribute('loading','lazy');
+ frame.style.cssText='display:block;width:100%;min-height:300px;border:1px solid #2c5c7c;border-radius:12px;background:white';
+ frame.srcdoc=site.html;
+ $('conversation').append(frame);
+ $('conversation').scrollTop=$('conversation').scrollHeight;
 }
 async function runJarvisCoreCommand(command){
  if(command.kind==='website'){
   const brief='Crea un sito web professionale per '+command.title;
+  if(brief.length>1200)return 'Descrizione troppo lunga. Nessun lavoro avviato.';
   $('siteBrief').value=brief;
-  document.getElementById('websiteBuilderPanel').scrollIntoView({behavior:'smooth',block:'start'});
-  return await generateSiteFromBrief(brief);
+  const email=$('siteEmail').value.trim();
+  if(email&&!$('siteEmail').checkValidity())return 'Correggi l’email del sito. Nessun lavoro avviato.';
+  // One conversational request starts one persistent, recoverable job AND its run.
+  // The service never publishes generated HTML or calls external deployment APIs.
+  const created=await post('/api/site-jobs',{brief,style:$('siteStyle').value,contactEmail:email});
+  const jobId=created.job?.id;
+  if(created.status!=='queued'||typeof jobId!=='string'||!/^[0-9a-f-]{36}$/i.test(jobId))
+   throw Error('Il Cloud non ha confermato un incarico valido. Verifica i lavori salvati prima di riprovare.');
+  $('siteJobsStatus').textContent='Incarico '+jobId+' salvato. JARVIS sta costruendo il sito…';
+  await loadSiteJobs();
+  try{
+   const result=await post('/api/site-jobs/'+encodeURIComponent(jobId)+'/run',{});
+   if(result.status!=='completed'||!result.job||result.job.id!==jobId)throw Error('Esecuzione non confermata dal server');
+   await openSiteJob(result.job,false);
+   await loadSiteJobs();
+   return 'Ho generato il sito «'+lastGeneratedSite.name+'» e ho salvato il risultato nel tuo Cloud. L’anteprima appare qui nella conversazione. Nessuna pubblicazione esterna eseguita.';
+  }catch(error){
+   await loadSiteJobs();
+   return 'Ho salvato l’incarico '+jobId+', ma non posso confermare il completamento: '+error.message+'. Controlla la sezione Lavori JARVIS prima di riprovare, per evitare duplicati.';
+  }
  }
 
  if(command.kind==='plan'){
@@ -455,6 +488,7 @@ $('chatForm').onsubmit=async e=>{
    if(command){
     const reply=await runJarvisCoreCommand(command);
     say(reply);
+    if(command.kind==='website'&&reply.startsWith('Ho generato il sito')&&lastGeneratedSite)showSitePreviewInChat(lastGeneratedSite);
     try{await post('/api/chat-history',{role:'assistant',content:reply})}
     catch(e){say('Comando gestito, ma il messaggio di conferma non è stato salvato nello storico: '+e.message,'system')}
     return;
@@ -621,7 +655,7 @@ async function loadSiteJobs(){
   status.textContent=result.jobs.length?'Lavori recuperati: '+result.jobs.length+'. I lavori non vengono eseguiti in background.':'Non ci sono incarichi salvati.';
  }catch(error){status.textContent='Impossibile caricare i lavori: '+error.message}
 }
-async function openSiteJob(job){
+async function openSiteJob(job,focusPanel=true){
  const response=await api('/api/site-drafts/'+encodeURIComponent(job.draft_id||job.id));
  const draft=response.draft;
  if(response.status!=='ok'||!draft||typeof draft.html!=='string'||draft.html.length>70000)throw Error('Sito generato non recuperabile');
@@ -631,7 +665,7 @@ async function openSiteJob(job){
  $('siteDownload').disabled=false;
  $('siteBrief').value=String(draft.brief||'').slice(0,1200);
  $('siteBuilderStatus').textContent='Sito recuperato dall’incarico JARVIS. Scarica il file o esamina l’anteprima. Non pubblicato.';
- document.getElementById('websiteBuilderPanel').scrollIntoView({behavior:'smooth',block:'start'});
+ if(focusPanel)document.getElementById('websiteBuilderPanel').scrollIntoView({behavior:'smooth',block:'start'});
 }
 $('siteJobCreate').onclick=async()=>{
  if(siteJobsBusy)return;
