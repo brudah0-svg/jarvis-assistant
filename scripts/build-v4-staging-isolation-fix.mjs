@@ -4,7 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 execFileSync(process.execPath,['scripts/build-v4-ui-hardened.mjs'],{stdio:'inherit'});
 const source=readFileSync('dist/jarvis-v4-ui-hardened.mjs','utf8');
-const deployment=JSON.parse(readFileSync('cloudflare/STAGING_V4_DEPLOYMENT.json','utf8'));
+const deployment=JSON.parse(readFileSync('cloudflare/STAGING_V4_DEPLOYMENT_ISOLATION_PREV.json','utf8'));
 const sha=s=>createHash('sha256').update(s).digest('hex');
 assert.equal(sha(source),deployment.source_sha256,'Baseline must match exactly deployed staging Worker');
 const marker='const STAGING_ONLY_MODE = true;';

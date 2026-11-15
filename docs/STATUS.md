@@ -137,6 +137,14 @@
 - User confirmed a second saved encrypted backup copy outside the phone; exact byte parity of that separate copy is still unverified.
 - Release still blocked pending fresh remote 10/10 on current staging, authenticated physical Android acceptance, review of release candidate provenance and explicit production approval.
 
+## Isolated staging HTTP 502 verifier repair — deployed (2026-11-15)
+
+- User observed HTTP 502 on authenticated `/api/staging/verify`. Diagnosis: production verifier expects 404 for an empty blocked POST `/api/tasks`; staging returned 400.
+- GitHub PR #30 passed CI and merged. Deployed narrow isolated-staging-only source change returning 404 for that exact request without relaxing any write restrictions.
+- Cloudflare staging version `80077801-2762-4ed3-8581-42b806032c4a`, source SHA-256 `b845663d63775b34d681bf7294287117b7915fa61f0b88722383e7d07c2b5f0a`, 330,634 characters — independently read back and verified.
+- Staging bindings remain only isolated D1 and version metadata; public Worker subdomain/previews disabled; D1 `PRAGMA quick_check=ok` and 1 synthetic project/1 task. Production version unchanged at `89f66668-175c-41ce-926c-b45aceef1f06`.
+- Previous staging `6c50ebad-cd5a-48af-b3e2-fbe8a2c66dcf` retained as rollback. Authenticated browser retest of `/api/staging/verify` has **not yet been witnessed**, nor a full current-version runtime 10/10 regression. Release remains blocked.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
