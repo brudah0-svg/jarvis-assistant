@@ -482,6 +482,9 @@ function parseJarvisCoreCommand(message){
     return {kind:'voice-cancel'};
   }
  }
+ // The user asks JARVIS to inspect itself; never interpret this as permission to deploy code.
+ if(/^(?:(?:auto)?analizzati|analizza il tuo (?:codice|sistema)|controlla come migliorarti|migliorati|valuta come migliorarti)(?:\s+e\s+(?:proponi|prepara)(?:\s+(?:dei|i))?\s+miglioramenti|\s+e\s+proponi\s+come\s+migliorarti)?[.!?]*$/i.test(input))
+  return {kind:'self-audit'};
  // Safe, deterministic routing: never let a free-form AI answer authorize a write.
  const multi=input.match(/^(?:crea|creami|costruisci|costruiscimi|realizza|fammi|sviluppa|preparami)\s+(?:(?:un|il)\s+)?(?:sito(?:\s+web)?\s+)?(?:multipagina|completo|a\s+(?:tre|3)\s+pagine)\s+(?:per|di)\s+(.+)$/i);
  if(multi)return{kind:'multi-build',title:multi[1].trim()};
@@ -585,6 +588,42 @@ function showMultipageProjectInChat(project){
 }
 async function runJarvisCoreCommand(command){
  if(command.kind==='voice-cancel')return 'Ricevuto, signore. Operazione annullata: nessuna modifica al Cloud.';
+ if(command.kind==='self-audit'){
+  // All evidence comes from existing protected APIs. Never infer approvals from model text.
+  // Executor and proposal preparation write only audit rows, not user project contents or code.
+  const [health,remediations]=await Promise.all([
+   api('/api/autonomy/status'),api('/api/autonomy/remediations')
+  ]);
+  if(!health||!['ok','passed','warning','attention','failed','not_run','unavailable'].includes(health.status)
+     ||!Array.isArray(health.pending_approvals)||remediations?.status!=='ok'||!Array.isArray(remediations.cases))
+   throw Error('Non posso verificare l’autodiagnostica: nessuna correzione effettuata.');
+  const open=remediations.cases.filter(x=>x.state==='needs_review');
+  const overview='Autodiagnostica generale: '+(health.latest
+   ?String(health.latest.checks_passed)+' controlli superati su '+String(health.latest.checks_total)
+   :'nessuna esecuzione recente verificata')+'. '+open.length+' anomalie richiedono revisione.';
+  const project=state.availability.projects&&state.projects.find(p=>
+    p?.status==='active'&&String(p.name||'').trim().toLocaleLowerCase('it')==='jarvis');
+  if(!project)
+   return overview+' Non trovo un progetto attivo chiamato JARVIS: non ho eseguito verifiche specifiche né creato proposte. Nessun codice modificato o pubblicato.';
+  const diagnostic=await post('/api/executor/run',{project_id:project.id});
+  if(diagnostic?.status==='already_requested')
+   return overview+' La diagnostica del progetto JARVIS è già stata richiesta in questo minuto; non ho duplicato l’operazione. Controlla lo storico Executor prima di riprovare. Nessun codice modificato.';
+  if(diagnostic?.status!=='completed'||diagnostic.read_only!==true||diagnostic.automatic_fix_applied!==false
+     ||!Number.isInteger(diagnostic.total_checks)||!Number.isInteger(diagnostic.passed)||!Number.isInteger(diagnostic.warnings))
+   throw Error('Esito Executor non verificabile: nessun miglioramento autorizzato.');
+  const prepared=await post('/api/self-improvement/prepare',{project_id:project.id});
+  if(prepared?.status!=='ok'||prepared.automatic_changes!==0||!Array.isArray(prepared.proposals)
+     ||!Number.isInteger(prepared.generated))
+   throw Error('Proposte non verificabili: nessun miglioramento autorizzato.');
+  const proposalCount=prepared.proposals.length;
+  return overview+' Sul progetto JARVIS ho completato '+diagnostic.total_checks+
+    ' verifiche: '+diagnostic.passed+' superate, '+diagnostic.warnings+' avvisi. '+
+    (proposalCount?'Ho preparato '+prepared.generated+' nuove proposte ('+proposalCount+
+      ' totali, comprese quelle già presenti). Puoi esaminarle in Self-Improvement.':
+      'Nessuna anomalia specifica richiede una proposta: non invento correzioni.')+
+    ' Questo controllo riguarda struttura e dati del progetto, non una revisione automatica del codice. QA Guardian verifica il codice separatamente su GitHub. Non ho modificato né distribuito codice; serve approvazione per gli aggiornamenti importanti.';
+ }
+
  if(command.kind==='website-clarify')return 'Ho capito che vuoi creare un sito, ma la dettatura non è abbastanza chiara. Dimmi per chi deve essere il sito, ad esempio «Jarvis, creami un sito web per un idraulico». Nessun lavoro è stato avviato.';
  if(command.kind==='project-clarify')return 'Posso creare un progetto nel Cloud, ma mi serve un nome preciso. Prova: «Jarvis, mi crei un progetto per il sito di un elettricista». Non ho creato nulla.';
 
