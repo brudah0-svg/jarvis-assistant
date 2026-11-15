@@ -174,6 +174,15 @@
 - **Not ready to mark released:** need physical authenticated Android acceptance for the unified Cloud route, verify the current 101-row encrypted off-device backup, complete security/release-candidate review, and obtain **explicit production deployment approval**. The build-only URL `/jarvis-unified` is not yet publicly routed on Cloudflare.
 - Keep both existing GitHub Pages app and existing Cloudflare production routes available until the data migration has been verified by the user. Do not automatically redirect or delete the local app.
 
+## Unified JARVIS protected additive release deployed (2026-11-15)
+
+- User explicitly authorized this **additive, reversible** release. Cloudflare Worker `jarvis-backend` now serves `/jarvis-unified` and `/jarvis-app.webmanifest` from the same access-protected host as the existing AI/data APIs.
+- Active Worker version `712920ae-5f79-4ac9-88f5-eaa15a871a66` read back and SHA-256 verified `a0a9784bd3bc1889173b09f5da9796094abc9a3f7cd6251cfe3d84e41573d3b4`, matching CI candidate; previous production version `89f66668-175c-41ce-926c-b45aceef1f06` retained as rollback.
+- Preserved all seven Worker bindings including secrets, Cloudflare Access policy, legacy production routes, staging service, and independent backup service. Production D1 integrity ok, still 2 projects and 20 tasks. Staging version and synthetic database unchanged and intact.
+- No data migration, localStorage deletion, approval execution, route redirection or user-data mutation. Existing GitHub Pages and `/jarvis` remain.
+- Evidence: [UNIFIED_CLOUDFLARE_RELEASE_2026-11-15.md](UNIFIED_CLOUDFLARE_RELEASE_2026-11-15.md) and `cloudflare/UNIFIED_PROTECTED_DEPLOYMENT_2026-11-15.json`.
+- **Next**: actual authenticated physical Android test of `/jarvis-unified`, check AI, navigation and install option. The current 101-row snapshot's independent external encrypted copy has not been verified; previous Android copy concerned 96 rows. Do not mark whole app complete until these remaining validations.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
