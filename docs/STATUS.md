@@ -46,6 +46,15 @@
 - Recent staging auto-check was `attention` (6/7), and production autonomous health check `attention` (6/9). The last independent off-account backup remains unverified. A fresh current-version regression remains required after any future backend deployment.
 - **Release gate remains blocked.** Source parity, CI tests, and a historical passing 10/10 cannot substitute for a new runtime test, verified independent backup, current candidate provenance, Android acceptance and explicit production release approval.
 
+## Isolated staging PATCH correction deployed and verified (2026-11-15)
+
+- **Current staging version:** `9da6659c-9f2e-4d18-a1c1-66f602cc2861`. Original version `a43a3a07-4e54-4577-a775-3a11db96258e` is the rollback target.
+- **Exact deployed code hash verified:** `b024e3dfa5e02614a9b689b42f49ac7e93cc1ba73a6c9b21ce6994b320f8eaca` with 326,963 JavaScript characters.
+- Only the isolated staging Worker was updated. Production remains at `89f66668-175c-41ce-926c-b45aceef1f06`.
+- Verified bindings: only isolated staging D1 `DB` and `VERSION`. `workers.dev` and public previews disabled; no Workers AI or VAPID binding. Staging D1 `PRAGMA quick_check = ok`, 1 synthetic project and 1 synthetic task.
+- Static candidate CI was green prior to upload. The live 10/10 regression has **not** yet been observed on this new version; the prior 9/10 run remains historical.
+- Release gate remains **blocked**, pending fresh live regression, independent encrypted off-account backup, Android acceptance, provenance manifest for the production candidate and explicit approval for production release.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
