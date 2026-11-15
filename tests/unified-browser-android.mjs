@@ -236,23 +236,30 @@ try{
  const download=await downloadPromise;
  assert.equal(download.suggestedFilename(),'sito-jarvis.html','Standalone site must download');
  const builderAfter=writes.filter(w=>w.path==='/api/site-builder').length;
- await page.locator('#chatInput').fill('Crea un sito web per Pinco Pallo elettricista in Veneto');
+ const queuedBefore=siteJobs.length;
+ const runBefore=writes.filter(w=>w.path.endsWith('/run')).length;
+ await page.locator('#chatInput').fill('Hey Jarvis, creami un sito web per Pinco Pallo elettricista in Veneto');
  await page.locator('#chatForm button[type=submit]').click();
  await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Ho generato il sito'),{timeout:15000});
- assert.equal(writes.filter(w=>w.path==='/api/site-builder').length,builderAfter+1,'Voice/text chat command must dispatch to Website Builder');
- assert.equal(savedDrafts.length,2,'Website command also saves the draft in private Cloud');
- assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0,'Saved drafts must not publish a site');
+ assert.equal(writes.filter(w=>w.path==='/api/site-builder').length,builderAfter,'Chat must use persistent jobs, not an untracked one-shot generation');
+ assert.equal(siteJobs.length,queuedBefore+1,'One utterance must create exactly one persistent job');
+ assert.equal(siteJobs.at(-1).status,'completed','The job must auto-run without clicking Avvia');
+ assert.equal(writes.filter(w=>w.path.endsWith('/run')).length,runBefore+1,'One utterance must auto-run exactly once');
+ assert.equal(savedDrafts.length,2,'Website command must save the result privately in Cloud D1');
+ assert.equal(await page.locator('#conversation iframe[sandbox=""]').count(),1,'Website preview must appear directly in JARVIS conversation');
+ assert.equal(await page.locator('#sitePreview').isHidden(),false);
+ assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0,'No external publication from chat');
 
 
  // Durable job: queue and run, then reload Android browser and recover the same completed site.
  await page.locator('#siteBrief').fill('Realizza un sito moderno per Pinco Pallo, manutenzione e domotica per famiglie.');
  await page.locator('#siteJobCreate').click();
  await page.waitForFunction(()=>document.querySelector('#siteJobsList button[data-job-id]'),{timeout:15000});
- assert.equal(siteJobs.length,1);
- assert.equal(siteJobs[0].status,'queued');
+ assert.equal(siteJobs.length,queuedBefore+2);
+ assert.equal(siteJobs.at(-1).status,'queued');
  await page.locator('#siteJobsList button[data-job-id]').click();
  await page.waitForFunction(()=>document.querySelector('#siteJobsStatus')?.textContent?.includes('Sito completato e salvato'),{timeout:15000});
- assert.equal(siteJobs[0].status,'completed');
+ assert.equal(siteJobs.at(-1).status,'completed');
  assert.equal(savedDrafts.length,3);
  assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0);
  await page.reload({waitUntil:'networkidle'});
