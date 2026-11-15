@@ -1,4 +1,22 @@
-if(path==="/api/site-builder"&&method==="POST"){
+if(path==="/api/site-drafts"&&method==="GET"){
+      if(!env.DB)return json({error:"Archivio bozze non disponibile"},503,origin);
+      try{
+        const records=await env.DB.prepare("SELECT id,title,brief,style,created_at FROM site_drafts ORDER BY created_at DESC,id DESC LIMIT 30").all();
+        return json({status:"ok",drafts:records.results||[]},200,origin);
+      }catch{return json({error:"Impossibile leggere le bozze Cloud"},503,origin)}
+    }
+    if(path.startsWith("/api/site-drafts/")&&method==="GET"){
+      if(!env.DB)return json({error:"Archivio bozze non disponibile"},503,origin);
+      const id=path.slice("/api/site-drafts/".length);
+      if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return json({error:"ID bozza non valido"},400,origin);
+      try{
+        const draft=await env.DB.prepare("SELECT id,title,brief,style,contact_email,html,created_at FROM site_drafts WHERE id=?").bind(id).first();
+        if(!draft)return json({error:"Bozza non trovata"},404,origin);
+        return json({status:"ok",draft},200,origin);
+      }catch{return json({error:"Errore recupero bozza"},503,origin)}
+    }
+
+    if(path==="/api/site-builder"&&method==="POST"){
       if(!env.AI)return json({error:"AI non configurata"},503,origin);
       try{
         const raw=await request.text();
@@ -15,7 +33,18 @@ if(path==="/api/site-builder"&&method==="POST"){
         const response=typeof model?.response==='string'?model.response:model?.choices?.[0]?.message?.content;
         const content=parseSiteContent(response);
         const html=renderSiteHtml(content,{style,contactEmail});
-        return json({status:"generated",format:"standalone-static-html",html,siteTitle:content.title,requires_publication_approval:true,production_deployed:false,operations_executed:false,notice:"Sito statico generato. Nessuna pubblicazione o modifica a progetti e database. Verifica i testi prima dell'uso."},200,origin);
+        let saved=false,draftId=null,saveError=null;
+        if(body.saveDraft===true){
+          if(!env.DB)saveError="Archivio bozze non disponibile, scarica il file HTML.";
+          else try{
+            const rows=await env.DB.prepare("SELECT COUNT(*) AS n FROM site_drafts").first();
+            if(!Number.isSafeInteger(Number(rows?.n))||Number(rows.n)>=30)throw Error("Limite di 30 bozze raggiunto");
+            draftId=crypto.randomUUID();
+            await env.DB.prepare("INSERT INTO site_drafts(id,title,brief,style,contact_email,html) VALUES (?,?,?,?,?,?)").bind(draftId,content.title.slice(0,110),brief,style,contactEmail,html).run();
+            saved=true;
+          }catch(e){draftId=null;saveError=e?.message==="Limite di 30 bozze raggiunto"?"Archivio pieno (30 bozze). Scarica HTML e contatta l'amministratore per la gestione delle bozze.":"Impossibile salvare nel Cloud: scarica l'HTML prima di chiudere la pagina.";}
+        }
+        return json({status:"generated",format:"standalone-static-html",html,siteTitle:content.title,saved,draftId,saveError,requires_publication_approval:true,production_deployed:false,operations_executed:false,notice:"Sito statico generato senza pubblicazione. Bozza nel Cloud solo se il salvataggio è confermato."},200,origin);
       }catch(error){
         console.error("JARVIS website builder",String(error).slice(0,230));
         return json({error:"Generazione non riuscita. Riprova con un brief più preciso."},502,origin);

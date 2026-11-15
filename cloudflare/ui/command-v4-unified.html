@@ -86,6 +86,13 @@ button{color:#d0edff}
 .site-builder-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.site-builder-actions button{min-height:43px;font-size:13px}
 #sitePreview{width:100%;height:560px;background:#fff;border:1px solid #2c5c7c;border-radius:12px;margin-top:16px}
 @media(max-width:680px){.site-builder-settings{grid-template-columns:1fr}#sitePreview{height:520px}}
+
+.site-drafts-toggle{display:flex;align-items:center;gap:9px;margin:5px 0;font-size:13px!important;line-height:1.5}
+.site-drafts-toggle input{width:18px;height:18px;flex-shrink:0;accent-color:var(--blue)}
+.site-drafts-panel{margin-top:20px;padding:16px;border-radius:12px;background:#071523;border:1px solid #24415b}
+.site-drafts-panel h3{font-size:16px;margin:0}.site-drafts-panel .item{align-items:center;gap:12px}
+.site-drafts-panel .item button{min-height:40px;font-size:12px}
+@media(max-width:680px){.site-drafts-panel{padding:12px}}
 </style>
   <title>JARVIS · Centro di comando unificato</title>
   <link rel="manifest" href="/jarvis-app.webmanifest">
@@ -165,10 +172,12 @@ button{color:#d0edff}
               <label for="siteStyle">Stile <select id="siteStyle"><option value="notte">Scuro elegante</option><option value="chiaro">Chiaro professionale</option><option value="energia">Energia</option></select></label>
               <label for="siteEmail">Email contatto (facoltativa)<input id="siteEmail" type="email" maxlength="250" placeholder="contatti@esempio.it"></label>
             </div>
+            <label class="site-drafts-toggle"><input type="checkbox" id="siteSaveDraft" checked> Salva automaticamente la bozza nel Cloud privato (massimo 30)</label>
             <div class="site-builder-actions"><button type="submit" id="siteGenerate" class="small-btn">Genera il mio sito</button><button id="siteVoice" class="small-btn" type="button">🎙 Descrivi a voce</button><button id="siteDownload" class="small-btn" type="button" disabled>Scarica sito HTML</button></div>
           </form>
           <p class="hint" id="siteBuilderStatus" role="status" aria-live="polite">JARVIS prepara una pagina HTML completa, visualizzabile offline. La pubblicazione richiede un'autorizzazione separata.</p>
           <iframe id="sitePreview" title="Anteprima isolata del sito generato" sandbox="" referrerpolicy="no-referrer" loading="lazy" hidden></iframe>
+          <div class="site-drafts-panel"><div class="panel-head"><h3>Bozze salvate</h3><button id="siteRefreshDrafts" type="button" class="small-btn">Aggiorna bozze</button></div><p class="hint" id="siteDraftsStatus" role="status" aria-live="polite">Caricamento bozze private…</p><div id="siteDraftsList" class="stack" aria-label="Le tue bozze salvate"></div></div>
           <p class="hint">Anteprima isolata, senza esecuzione di JavaScript, connessioni esterne o pubblicazione automatica. Rivedi testi e contatti prima di utilizzare il risultato.</p>
         </article>
         <article class="panel wide assistant">
@@ -528,13 +537,14 @@ async function generateSiteFromBrief(brief){
  $('sitePreview').hidden=true;$('sitePreview').removeAttribute('srcdoc');
  status.textContent='Sto progettando struttura, testi e design del sito…';
  try{
-  const result=await post('/api/site-builder',{brief:clean,style:$('siteStyle').value,contactEmail:email});
+  const result=await post('/api/site-builder',{brief:clean,style:$('siteStyle').value,contactEmail:email,saveDraft:$('siteSaveDraft').checked});
   if(result.status!=='generated'||result.format!=='standalone-static-html'||typeof result.html!=='string'||result.html.length<400||result.production_deployed!==false||result.requires_publication_approval!==true)throw Error('Il generatore non ha restituito un sito verificabile.');
   lastGeneratedSite={html:result.html,name:result.siteTitle||'sito-jarvis'};
   $('sitePreview').srcdoc=result.html;
   $('sitePreview').hidden=false;
   $('siteDownload').disabled=false;
-  status.textContent='Sito generato: anteprima pronta. Controlla i testi e premi Scarica sito HTML per salvare il file sul telefono. Nessuna pubblicazione effettuata.';
+  status.textContent='Sito generato, anteprima pronta. '+(result.saved?'Bozza salvata nel Cloud.':result.saveError?'ATTENZIONE: '+result.saveError:'Non salvato nel Cloud.')+' Puoi scaricare il file HTML. Nessuna pubblicazione effettuata.';
+  if(result.saved)await loadSiteDrafts();
   return 'Ho generato il sito «'+lastGeneratedSite.name+'» e mostrato l’anteprima. Puoi scaricarlo dal Website Builder. Non è stato pubblicato.';
  }finally{siteGenerating=false;$('siteGenerate').disabled=false}
 }
@@ -558,7 +568,52 @@ $('siteVoice').onclick=()=>{
  rec.onerror=()=>{$('siteBuilderStatus').textContent='Dettatura interrotta: usa la tastiera o riprova.'};rec.start();
 };
 
+
+async function loadSiteDrafts(){
+ const list=$('siteDraftsList'),status=$('siteDraftsStatus');
+ if(STATIC_PREVIEW){status.textContent='Archivio disponibile solo nella versione Cloud autenticata.';return}
+ try{
+  const response=await api('/api/site-drafts');
+  if(response.status!=='ok'||!Array.isArray(response.drafts))throw Error('Risposta non valida');
+  list.replaceChildren();
+  for(const draft of response.drafts){
+   if(!draft||typeof draft.id!=='string'||typeof draft.title!=='string')continue;
+   const item=document.createElement('div');item.className='item';
+   const info=document.createElement('div');
+   const title=document.createElement('strong');title.textContent=draft.title.slice(0,110);
+   const detail=document.createElement('small');detail.textContent=(draft.style||'notte')+' · '+(draft.created_at||'Data non disponibile');
+   info.append(title,detail);
+   const button=document.createElement('button');button.type='button';button.className='small-btn';button.textContent='Riapri';button.dataset.siteDraftId=draft.id;
+   item.append(info,button);list.append(item);
+  }
+  status.textContent=response.drafts.length?response.drafts.length+' bozze nel Cloud privato. Riapri una bozza per visualizzarla e scaricarla.':'Non hai ancora bozze salvate.';
+ }catch(error){status.textContent='Bozze temporaneamente non disponibili: '+error.message}
+}
+$('siteRefreshDrafts').onclick=()=>loadSiteDrafts();
+$('siteDraftsList').onclick=async event=>{
+ const button=event.target.closest('button[data-site-draft-id]');
+ if(!button)return;
+ const id=button.dataset.siteDraftId;
+ if(!/^[0-9a-f-]{36}$/i.test(id))return;
+ button.disabled=true;
+ try{
+  const r=await api('/api/site-drafts/'+encodeURIComponent(id));
+  const draft=r.draft;
+  if(r.status!=='ok'||!draft||typeof draft.html!=='string'||draft.html.length>70000)throw Error('Bozza non valida');
+  lastGeneratedSite={html:draft.html,name:draft.title||'sito-jarvis'};
+  $('siteBrief').value=String(draft.brief||'').slice(0,1200);
+  $('siteStyle').value=['notte','chiaro','energia'].includes(draft.style)?draft.style:'notte';
+  $('siteEmail').value=String(draft.contact_email||'');
+  $('sitePreview').srcdoc=draft.html;
+  $('sitePreview').hidden=false;
+  $('siteDownload').disabled=false;
+  $('siteBuilderStatus').textContent='Bozza «'+lastGeneratedSite.name+'» recuperata dal Cloud. Anteprima e download disponibili. Nessuna pubblicazione effettuata.';
+  document.getElementById('websiteBuilderPanel').scrollIntoView({behavior:'smooth',block:'start'});
+ }catch(error){$('siteBuilderStatus').textContent='Impossibile riaprire la bozza: '+error.message}
+ finally{button.disabled=false}
+};
+
 function tick(){$('clock').textContent=new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}
-tick();setInterval(tick,30000);loadAll();loadChatHistory();</script>
+tick();setInterval(tick,30000);loadAll();loadChatHistory();loadSiteDrafts();</script>
 </body>
 </html>
