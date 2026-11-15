@@ -569,6 +569,7 @@ async function generateSiteFromBrief(brief){
   $('siteDownload').disabled=false;
   status.textContent='Sito generato, anteprima pronta. '+(result.saved?'Bozza salvata nel Cloud.':result.saveError?'ATTENZIONE: '+result.saveError:'Non salvato nel Cloud.')+' Puoi scaricare il file HTML. Nessuna pubblicazione effettuata.';
   if(result.saved)await loadSiteDrafts();
+  if(!chatBusy)jarvisSpeak('Signore, il sito è pronto. Può vedere l’anteprima e scaricarlo.');
   return 'Ho generato il sito «'+lastGeneratedSite.name+'» e mostrato l’anteprima. Puoi scaricarlo dal Website Builder. Non è stato pubblicato.';
  }finally{siteGenerating=false;$('siteGenerate').disabled=false}
 }
