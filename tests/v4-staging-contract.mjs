@@ -35,6 +35,7 @@ const proposals=await hit('/api/proposals');assert.equal(proposals.status,200);a
 assert.equal((await hit('/api/memory','POST')).status,405);
 assert.equal((await hit('/api/ai-chat','POST')).status,405);
 assert.equal((await hit('/api/chat-history','POST')).status,405);
+assert.equal((await hit('/api/tasks/staging-task','PATCH')).status,405,'PATCH to staging must remain blocked (405 is a valid method-denied response)');
 assert.equal((await hit('/api/ai-plan','POST')).status,405);
 assert.equal((await hit('/api/recovery/preflight')).status,404);
 assert.equal((await hit('/api/autonomy/status')).status,404);
