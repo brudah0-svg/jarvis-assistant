@@ -17,6 +17,13 @@ const memories=[{id:'memory-base',content:'Memoria Cloud',category:'Altro',creat
 const proposals=[];
 const savedDrafts=[];
 const siteJobs=[];
+const multipageProjects=[];
+const multiFiles={
+ 'index.html':'<!doctype html><html><body><nav><a href="index.html">Home</a><a href="servizi.html">Servizi</a><a href="contatti.html">Contatti</a></nav><h1>Officina Demo Home</h1></body></html>',
+ 'servizi.html':'<!doctype html><html><body><nav><a href="index.html">Home</a><a href="servizi.html">Servizi</a><a href="contatti.html">Contatti</a></nav><h1>Officina Demo Servizi</h1></body></html>',
+ 'contatti.html':'<!doctype html><html><body><nav><a href="index.html">Home</a><a href="servizi.html">Servizi</a><a href="contatti.html">Contatti</a></nav><h1>Officina Demo Contatti</h1></body></html>'
+};
+
 const requests=[],writes=[];
 let counter=0,externalNetwork=[];
 const json=(res,status,data)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}).end(JSON.stringify(data))};
@@ -31,6 +38,15 @@ const server=createServer(async(req,res)=>{
   if(!path.startsWith('/api/')){res.writeHead(404).end('Not Found');return}
   requests.push({path,method:req.method});
   if(req.method==='GET'){
+   if(path==='/api/site-projects')return json(res,200,{status:'ok',projects:multipageProjects.map(({id,title})=>({id,title}))});
+   if(path.startsWith('/api/site-projects/')&&path.endsWith('/export')){
+    const id=path.split('/')[3];if(!multipageProjects.some(p=>p.id===id))return json(res,404,{error:'Not found'});
+    res.writeHead(200,{'Content-Type':'application/zip','Content-Disposition':'attachment; filename="jarvis-sito-multipagina.zip"'}).end(Buffer.concat([Buffer.from([0x50,0x4b,0x03,0x04]),Buffer.alloc(1024)]));return;
+   }
+   if(path.startsWith('/api/site-projects/')){
+    const id=path.split('/')[3],project=multipageProjects.find(p=>p.id===id);
+    return json(res,project?200:404,project?{status:'ok',project}:{error:'Not found'});
+   }
    if(path==='/api/site-jobs')return json(res,200,{status:'ok',jobs:siteJobs});
    if(path.startsWith('/api/site-jobs/')){const found=siteJobs.find(j=>j.id===path.split('/').pop());return json(res,found?200:404,found?{status:'ok',job:found}:{error:'Not found'});}
    if(path==='/api/site-drafts')return json(res,200,{status:'ok',drafts:savedDrafts.map(({id,title,brief,style,created_at})=>({id,title,brief,style,created_at}))});
@@ -60,6 +76,12 @@ const server=createServer(async(req,res)=>{
   if(path==='/api/memory'&&req.method==='POST'){
    const memory={id:'created-memory-'+(++counter),content:body.content,category:body.category,created_at:'2026-11-15'};
    memories.push(memory);return json(res,201,{status:'created',memory});
+  }
+  if(path==='/api/site-projects'&&req.method==='POST'){
+   const id='00000000-0000-4000-8000-'+String(++counter).padStart(12,'0');
+   const project={id,title:'Officina Demo',brief:body.brief,files:multiFiles,audit:{passed:true,pages_checked:3},attempts:1};
+   multipageProjects.unshift(project);
+   return json(res,201,{status:'completed',format:'three-page-static-site',project,production_deployed:false,requires_publication_approval:true,external_actions_executed:false});
   }
   if(path==='/api/site-jobs'&&req.method==='POST'){
     const id='00000000-0000-4000-8000-'+String(++counter).padStart(12,'0');
@@ -285,6 +307,29 @@ try{
  assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0);
 
 
+
+ // One voice/text command creates three private pages, and retrieval/navigation remains same-origin.
+ const writesBeforeMulti=writes.filter(w=>w.path==='/api/site-projects').length;
+ await page.locator('#chatInput').fill('Hey Jarvis, creami un sito multipagina per Officina Demo');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Ho creato il sito multipagina'),{timeout:15000});
+ assert.equal(writes.filter(w=>w.path==='/api/site-projects').length,writesBeforeMulti+1);
+ assert.equal(multipageProjects.length,1);
+ assert.equal(await page.locator('#conversation iframe[title="Anteprima isolata multipagina"]').count(),1);
+ assert.equal(await page.locator('#conversation iframe[title="Anteprima isolata multipagina"]').getAttribute('sandbox'),'');
+ const controls=page.locator('#conversation section').last();
+ await controls.getByRole('button',{name:'Servizi'}).click();
+ assert((await page.locator('#conversation iframe[title="Anteprima isolata multipagina"]').getAttribute('srcdoc')).includes('Officina Demo Servizi'));
+ const zipDownload=page.waitForEvent('download',{timeout:10000});
+ await controls.getByRole('button',{name:'Scarica ZIP'}).click();
+ assert.equal((await zipDownload).suggestedFilename(),'jarvis-sito-multipagina.zip');
+ await page.locator('#chatInput').fill('Hey Jarvis, apri l’ultimo sito multipagina');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Ho recuperato il tuo ultimo sito multipagina'),{timeout:15000});
+ assert.equal(await page.locator('#conversation iframe[title="Anteprima isolata multipagina"]').count(),2);
+ assert.equal(multipageProjects.length,1,'Read-only retrieval must not regenerate');
+ assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0);
+ 
  // Tap-to-talk: a recognized Italian phrase submits to the existing AI path;
  // only then does JARVIS speak the server-supplied reply.
  await page.locator('#voiceBtn').click();
