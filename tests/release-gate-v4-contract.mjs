@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import worker from '../cloudflare/workers/jarvis-backend.mjs';
 
 // These tests exercise the real release gate using synthetic, in-memory
 // database and service-binding responses. They cannot deploy production.
 const prodVersion='89f66668-175c-41ce-926c-b45aceef1f06';
-const stagingVersion='a43a3a07-4e54-4577-a775-3a11db96258e';
+const stagingVersion=JSON.parse(readFileSync('cloudflare/STAGING_V4_DEPLOYMENT.json','utf8')).version_id;
+assert.match(stagingVersion,/^[0-9a-f-]{36}$/,'Release gate must test current pinned staging version');
 const historicalStagingVersion='f126a794-698e-454f-ae63-3185a91632d2';
 const goodHash='a'.repeat(64);
 const fresh=()=>new Date().toISOString().replace('T',' ').replace('Z','');
