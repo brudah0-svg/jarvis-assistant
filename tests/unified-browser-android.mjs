@@ -55,7 +55,7 @@ const server=createServer(async(req,res)=>{
    if(path==='/api/tasks')return json(res,200,{tasks});
    if(path==='/api/memory')return json(res,200,{memories});
    if(path==='/api/proposals')return json(res,200,{proposals});
-   if(path==='/api/autonomy/status')return json(res,200,{status:'passed',latest:{checks_passed:5,checks_total:5},pending_approvals:[],automatic_publication:false});
+   if(path==='/api/autonomy/status')return json(res,200,{status:'healthy',latest:{checks_passed:5,checks_total:5},pending_approvals:[],automatic_publication:false});
     if(path==='/api/autonomy/remediations')return json(res,200,{status:'ok',cases:[{state:'needs_review',title:'Synthetic QA finding'}],automatic_execution:false});
     if(path==='/api/chat-history')return json(res,200,{messages:[]});
    return json(res,404,{error:'Route unavailable'});
@@ -463,7 +463,7 @@ try{
  const tasksBeforeAudit=tasks.length,projectsBeforeAudit=projects.length;
  await page.locator('#chatInput').fill('Hey Jarvis, analizzati e proponi come migliorarti');
  await page.locator('#chatForm button[type=submit]').click();
- await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Ho preparato 1 nuove proposte'),{timeout:15000});
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Ho preparato 1 nuova proposta'),{timeout:15000});
  assert.equal(writes.filter(w=>w.path==='/api/executor/run').length,1,'Self audit must execute only one diagnostic');
  assert.equal(writes.filter(w=>w.path==='/api/self-improvement/prepare').length,1,'Self audit must prepare reviewed proposals');
  assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,aiBeforeAudit,'Self audit cannot be fabricated by an advisory AI response');
