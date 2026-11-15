@@ -79,6 +79,13 @@ button{color:#d0edff}
  .item{align-items:flex-start;flex-wrap:wrap}
  .item-actions{margin-left:auto}
 }
+
+.site-builder-form{display:grid;gap:11px}.site-builder-form label{color:var(--muted);font-size:13px;font-weight:650}
+.site-builder-form textarea,.site-builder-form input,.site-builder-form select{background:#071523;border:1px solid #2a4a63;color:var(--text);border-radius:8px;padding:12px;font:inherit;width:100%}
+.site-builder-form textarea{resize:vertical;min-height:118px;line-height:1.55}.site-builder-settings{display:grid;grid-template-columns:1fr 1fr;gap:12px}.site-builder-settings label{display:grid;gap:7px}
+.site-builder-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.site-builder-actions button{min-height:43px;font-size:13px}
+#sitePreview{width:100%;height:560px;background:#fff;border:1px solid #2c5c7c;border-radius:12px;margin-top:16px}
+@media(max-width:680px){.site-builder-settings{grid-template-columns:1fr}#sitePreview{height:520px}}
 </style>
   <title>JARVIS · Centro di comando unificato</title>
   <link rel="manifest" href="/jarvis-app.webmanifest">
@@ -149,6 +156,21 @@ button{color:#d0edff}
 <a class="module" href="/recovery-download-v3"><strong>Recovery</strong><small>Archivio cifrato D1</small></a>
 </div><p class="hint">Le funzioni avanzate vengono aperte sullo stesso dominio autenticato. Nessuna operazione viene eseguita semplicemente aprendo un modulo.</p>
 </article>
+        <article class="panel wide" id="websiteBuilderPanel">
+          <div class="panel-head"><div><p class="eyebrow">AGENTE OPERATIVO · WEBSITE BUILDER</p><h2>Crea un sito con JARVIS</h2></div><span class="tag">AI · ANTEPRIMA PRIVATA</span></div>
+          <form id="siteBuilderForm" class="site-builder-form">
+            <label for="siteBrief">Descrivi il sito che desideri</label>
+            <textarea id="siteBrief" maxlength="1200" minlength="15" required placeholder="Crea un sito elegante per Pinco Pallo, elettricista a Verona. Servizi: impianti elettrici, domotica, manutenzione..."></textarea>
+            <div class="site-builder-settings">
+              <label for="siteStyle">Stile <select id="siteStyle"><option value="notte">Scuro elegante</option><option value="chiaro">Chiaro professionale</option><option value="energia">Energia</option></select></label>
+              <label for="siteEmail">Email contatto (facoltativa)<input id="siteEmail" type="email" maxlength="250" placeholder="contatti@esempio.it"></label>
+            </div>
+            <div class="site-builder-actions"><button type="submit" id="siteGenerate" class="small-btn">Genera il mio sito</button><button id="siteVoice" class="small-btn" type="button">🎙 Descrivi a voce</button><button id="siteDownload" class="small-btn" type="button" disabled>Scarica sito HTML</button></div>
+          </form>
+          <p class="hint" id="siteBuilderStatus" role="status" aria-live="polite">JARVIS prepara una pagina HTML completa, visualizzabile offline. La pubblicazione richiede un'autorizzazione separata.</p>
+          <iframe id="sitePreview" title="Anteprima isolata del sito generato" sandbox="" referrerpolicy="no-referrer" loading="lazy" hidden></iframe>
+          <p class="hint">Anteprima isolata, senza esecuzione di JavaScript, connessioni esterne o pubblicazione automatica. Rivedi testi e contatti prima di utilizzare il risultato.</p>
+        </article>
         <article class="panel wide assistant">
           <div class="panel-head"><div><p class="eyebrow">INTERFACCIA</p><h2>Parla con JARVIS</h2></div><span class="tag">AI CLOUD</span></div>
           <div id="conversation" class="conversation"><div class="bubble jarvis">Sì, signore. Sono collegato al centro di comando Cloud. Le operazioni importanti richiedono la tua approvazione.</div></div>
@@ -330,6 +352,8 @@ let chatBusy=false;
 // Core command execution: explicit, user-initiated and reversible. Never invoke AI for a write.
 function parseJarvisCoreCommand(message){
  const input=String(message||'').replace(/^(?:ehi|hey)\s+jarvis[\s,:-]*/i,'').trim();
+ const website=input.match(/^(?:crea|creami|costruisci|realizza)\s+(?:(?:un|il)\s+)?(?:sito\s*(?:web)?|landing\s*page)\s*(?:per\s+|[:\-]\s*|di\s+)(.+)$/i);
+ if(website)return {kind:'website',title:website[1].trim()};
  const project=input.match(/^(?:crea|creami|avvia)\s+(?:(?:un|il)\s+)?(?:nuovo\s+)?progetto\s*[:\-]?\s+(.+)$/i);
  if(project)return {kind:'project',title:project[1].trim()};
  const task=input.match(/^(?:aggiungi|crea|creami)\s+(?:(?:una|un)\s+)?(?:nuova\s+)?(?:attivit[àa]|task)\s*[:\-]?\s+(.+)$/i);
@@ -339,6 +363,13 @@ function parseJarvisCoreCommand(message){
  return null;
 }
 async function runJarvisCoreCommand(command){
+ if(command.kind==='website'){
+  const brief='Crea un sito web professionale per '+command.title;
+  $('siteBrief').value=brief;
+  document.getElementById('websiteBuilderPanel').scrollIntoView({behavior:'smooth',block:'start'});
+  return await generateSiteFromBrief(brief);
+ }
+
  if(command.kind==='plan'){
   if(command.title.length<5||command.title.length>900)return 'Descrivi un obiettivo tra 5 e 900 caratteri. Nessuna modifica eseguita.';
   const result=await post('/api/plan',{goal:command.title});
@@ -482,6 +513,49 @@ $('workspaceFile').onchange=async event=>{
    await loadAll();workspaceImportBusy=false;$('importLocalWorkspace').disabled=false;
   }
  }catch(error){line.textContent='Importazione non eseguita: '+error.message}
+};
+
+
+let lastGeneratedSite=null,siteGenerating=false;
+async function generateSiteFromBrief(brief){
+ const status=$('siteBuilderStatus');const clean=String(brief||'').trim();
+ if(STATIC_PREVIEW)throw Error('Website Builder disponibile solo sul Cloud JARVIS autenticato.');
+ if(clean.length<15||clean.length>1200)throw Error('Descrivi il sito in 15-1200 caratteri.');
+ if(siteGenerating)throw Error('È già in corso una generazione.');
+ const email=$('siteEmail').value.trim();
+ if(email&&!$('siteEmail').checkValidity())throw Error('Indirizzo email non valido.');
+ siteGenerating=true;$('siteGenerate').disabled=true;$('siteDownload').disabled=true;lastGeneratedSite=null;
+ $('sitePreview').hidden=true;$('sitePreview').removeAttribute('srcdoc');
+ status.textContent='Sto progettando struttura, testi e design del sito…';
+ try{
+  const result=await post('/api/site-builder',{brief:clean,style:$('siteStyle').value,contactEmail:email});
+  if(result.status!=='generated'||result.format!=='standalone-static-html'||typeof result.html!=='string'||result.html.length<400||result.production_deployed!==false||result.requires_publication_approval!==true)throw Error('Il generatore non ha restituito un sito verificabile.');
+  lastGeneratedSite={html:result.html,name:result.siteTitle||'sito-jarvis'};
+  $('sitePreview').srcdoc=result.html;
+  $('sitePreview').hidden=false;
+  $('siteDownload').disabled=false;
+  status.textContent='Sito generato: anteprima pronta. Controlla i testi e premi Scarica sito HTML per salvare il file sul telefono. Nessuna pubblicazione effettuata.';
+  return 'Ho generato il sito «'+lastGeneratedSite.name+'» e mostrato l’anteprima. Puoi scaricarlo dal Website Builder. Non è stato pubblicato.';
+ }finally{siteGenerating=false;$('siteGenerate').disabled=false}
+}
+$('siteBuilderForm').onsubmit=async e=>{
+ e.preventDefault();
+ try{await generateSiteFromBrief($('siteBrief').value)}
+ catch(error){$('siteBuilderStatus').textContent='Generazione non riuscita: '+error.message}
+};
+$('siteDownload').onclick=()=>{
+ if(!lastGeneratedSite)return;
+ const blob=new Blob([lastGeneratedSite.html],{type:'text/html;charset=utf-8'});
+ const url=URL.createObjectURL(blob);
+ const link=document.createElement('a');link.href=url;link.download='sito-jarvis.html';link.style.display='none';
+ document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);
+};
+$('siteVoice').onclick=()=>{
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){$('siteBuilderStatus').textContent='Riconoscimento vocale non supportato. Puoi scrivere il brief nella casella.';return}
+ const rec=new SR();rec.lang='it-IT';rec.maxAlternatives=1;
+ rec.onresult=e=>{$('siteBrief').value=e.results[0][0].transcript;$('siteBuilderStatus').textContent='Descrizione riconosciuta. Premi Genera il mio sito.'};
+ rec.onerror=()=>{$('siteBuilderStatus').textContent='Dettatura interrotta: usa la tastiera o riprova.'};rec.start();
 };
 
 function tick(){$('clock').textContent=new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}
