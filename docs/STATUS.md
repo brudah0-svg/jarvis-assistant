@@ -87,6 +87,13 @@
 - Staging public workers.dev and previews disabled; isolated D1 and VERSION bindings; D1 quick check = ok with one synthetic project and one task. Production unchanged at `89f66668-175c-41ce-926c-b45aceef1f06`.
 - **Release gate remains blocked:** current-version 10/10 remote Cloudflare regression, independent encrypted off-account backup, authenticated physical Android acceptance and approval incomplete.
 
+## Current-version release gate and scheduled regression checks (2026-11-15)
+
+- GitHub PR #23 merged after successful GitHub Actions tests. The synthetic release-gate contract now reads its staging version from the current `cloudflare/STAGING_V4_DEPLOYMENT.json` rather than hardcoding a stale version.
+- Additional source contract confirms production Worker cron logic: automatic checks every six hours, full remote staging regression only for the scheduled 00:00 UTC run, results recorded to D1, exactly 10/10 plus successful fixture cleanup, 24-hour freshness and exact version matching.
+- Cloudflare cron configured as `0 */6 * * *`. The daily regression is **not** automatically run by the GitHub tests; current remote 10/10 evidence is not yet present.
+- Production remains pinned; the release gate remains blocked until current-version remote runtime result, independent encrypted external backup, authenticated Android acceptance, provenance and human authorization.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
