@@ -183,6 +183,15 @@
 - Evidence: [UNIFIED_CLOUDFLARE_RELEASE_2026-11-15.md](UNIFIED_CLOUDFLARE_RELEASE_2026-11-15.md) and `cloudflare/UNIFIED_PROTECTED_DEPLOYMENT_2026-11-15.json`.
 - **Next**: actual authenticated physical Android test of `/jarvis-unified`, check AI, navigation and install option. The current 101-row snapshot's independent external encrypted copy has not been verified; previous Android copy concerned 96 rows. Do not mark whole app complete until these remaining validations.
 
+## Unified Android readability roll-forward — online (2026-11-15)
+
+- User-provided physical Android video confirmed that authenticated Cloud interface, project/task/memory cards and AI chat render, but displayed squeezed desktop-mode columns and an AI statement potentially confusing a plan with a human approval. The video did not establish complete autonomous feature execution.
+- GitHub PR #38: narrow-viewport responsive single-column CSS and improved text/tap targets passed mobile Chromium CI. PR #39: added visible clarification that AI suggestions are **not** human approvals, passing synthetic Android Chromium run `43721663998` and source safety run `43721664023`.
+- Applied the **UI-only change** to the already user-authorized protected `/jarvis-unified` route. Cloudflare Worker now deployed as `e346679f-6295-441b-bf4e-1c6848891d97`; full JavaScript source re-read with SHA-256 `87a659e41fea55926aa8f165a8608df11523f4467479f52470196406557e6b57`, exact planned candidate. Old Worker `712920ae-5f79-4ac9-88f5-eaa15a871a66` retained for rollback.
+- Cloudflare Access remains enabled, all seven bindings including secrets preserved, no data migration, no changes to original `/jarvis` route or GitHub Pages. Production D1 `quick_check=ok`, still 2 projects and 20 tasks; staging D1 intact, unchanged version and 1+1 synthetic fixtures.
+- Source evidence: `cloudflare/UNIFIED_ANDROID_UI_ROLLFORWARD_2026-11-15.json`.
+- **Limits**: actual Android post-fix screenshots not yet independently checked; AI chat generated text is not proof of plan approval/execution; no claim that all future agent autonomy features are complete. Verify those independently before certification.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
