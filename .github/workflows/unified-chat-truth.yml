@@ -1,0 +1,31 @@
+name: JARVIS unified AI approval truth contract
+on:
+  pull_request:
+    paths:
+      - 'scripts/build-unified-trusted-chat.mjs'
+      - 'tests/unified-chat-truth.mjs'
+      - 'cloudflare/ui/command-v4-unified.html'
+      - '.github/workflows/unified-chat-truth.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/unified-chat-truth.yml'
+      - 'scripts/build-unified-trusted-chat.mjs'
+      - 'tests/unified-chat-truth.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trusted-chat:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check actual unified Worker and AI endpoint with synthetic D1
+        run: node tests/unified-chat-truth.mjs
