@@ -1,0 +1,25 @@
+{
+  "format": "jarvis-staging-v4-deployed-source-v1",
+  "worker": "jarvis-staging",
+  "version_id": "b27360b9-b467-4770-beeb-bf8f08629a6d",
+  "source_sha256": "9b12762d54cb53ae883a1ee1d0525a454012c646c05af69be0b3f24883fe7c6a",
+  "source_chars": 330067,
+  "built_from": [
+    "cloudflare/workers/jarvis-staging.mjs",
+    "cloudflare/ui/command-v4-staging-snapshot.html",
+    "scripts/build-v4-staging.mjs",
+    "scripts/build-v4-staging-next.mjs",
+    "cloudflare/ui/command-v4.html",
+    "scripts/build-v4-ui-next.mjs"
+  ],
+  "cloudflare_deployed_verified": true,
+  "scope": "isolated staging only; no production deployment",
+  "security": {
+    "workers_dev": false,
+    "previews_enabled": false,
+    "ai_binding": false,
+    "production_database_binding": false,
+    "rollback_version": "9da6659c-9f2e-4d18-a1c1-66f602cc2861"
+  },
+  "source_note": "Current Cloud v4 dashboard tested with isolated staging fixtures and strict read-only controls, independently deployed and SHA-256 verified. Historical release manifests retained."
+}
