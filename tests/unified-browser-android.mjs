@@ -74,6 +74,8 @@ try{
  });
  page.on('dialog',async dialog=>{
   dialogs.push({type:dialog.type(),message:dialog.message()});
+  if(dialog.message().includes('Confermi la creazione del progetto')){await dialog.dismiss();return}
+  if(dialog.message().includes('Creare l’attività')){await dialog.accept();return}
   if(dialog.message().startsWith('Importare nel Cloud')){
    if(dialogs.filter(d=>d.message.startsWith('Importare nel Cloud')).length===1)await dialog.dismiss();
    else await dialog.accept();
@@ -139,6 +141,27 @@ try{
  await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Risposta sintetica'),{timeout:15000});
  assert(writes.some(w=>w.path==='/api/ai-chat'&&w.body.message==='Ciao JARVIS, test sintetico'));
  assert(writes.some(w=>w.path==='/api/chat-history'&&w.body.role==='user'));
+ // Actual core commands. The first project confirmation is denied: no write.
+ const projectWritesBefore=writes.filter(w=>w.path==='/api/projects').length;
+ await page.locator('#chatInput').fill('Crea progetto: Da non salvare');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Creazione annullata'),{timeout:15000});
+ assert.equal(writes.filter(w=>w.path==='/api/projects').length,projectWritesBefore,'Denied project create must not mutate D1');
+ assert(!projects.some(p=>p.name==='Da non salvare'));
+ // A task must target an explicitly selected existing Cloud project; no guessing.
+ await page.locator('#activeProject').selectOption('cloud-base');
+ const aiCallsBefore=writes.filter(w=>w.path==='/api/ai-chat').length;
+ await page.locator('#chatInput').fill('Aggiungi attività: Controlla il prototipo');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('creata nel progetto'),{timeout:15000});
+ assert(tasks.some(t=>t.title==='Controlla il prototipo'&&t.project_id==='cloud-base'));
+ assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,aiCallsBefore,'Confirmed operational command must not be reinterpreted by AI');
+ const coreTaskCount=writes.filter(w=>w.path==='/api/tasks'&&w.method==='POST').length;
+ await page.locator('#chatInput').fill('Aggiungi attività: Controlla il prototipo');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('nessun duplicato creato'),{timeout:15000});
+ assert.equal(writes.filter(w=>w.path==='/api/tasks'&&w.method==='POST').length,coreTaskCount,'Repeated core task must not duplicate');
+ assert.equal(proposals.length,0,'Chat core commands must not authorize proposals');
  assert.deepEqual(jsErrors,[],'No unhandled JS errors');
  assert.deepEqual(externalNetwork,[],'No external domains were contacted');
  mkdirSync('dist/browser-artifacts',{recursive:true});
