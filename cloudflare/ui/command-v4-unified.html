@@ -153,7 +153,7 @@ button{color:#d0edff}
           <div class="panel-head"><div><p class="eyebrow">INTERFACCIA</p><h2>Parla con JARVIS</h2></div><span class="tag">AI CLOUD</span></div>
           <div id="conversation" class="conversation"><div class="bubble jarvis">Sì, signore. Sono collegato al centro di comando Cloud. Le operazioni importanti richiedono la tua approvazione.</div></div>
           <form id="chatForm" class="chat-form"><input id="chatInput" autocomplete="off" placeholder="Scrivi un comando o una nota…" aria-label="Messaggio per JARVIS"><button class="send" type="submit">INVIA</button><button id="voiceBtn" class="voice" type="button" title="Dettatura vocale">🎙</button></form>
-          <p class="hint" id="aiApprovalNotice">Comandi operativi: «Crea progetto: Nome» e «Aggiungi attività: Titolo» (con conferma prima della scrittura). La chat AI può proporre piani, ma non può dichiararli approvati: verifica sempre le richieste nel Centro approvazioni. Nessun acquisto, invio o modifica viene eseguito dalla sola risposta della chat. La dettatura dipende dal browser Android.</p>
+          <p class="hint" id="aiApprovalNotice">Comandi: «Crea progetto: Nome», «Aggiungi attività: Titolo» e «Pianifica: Obiettivo» (con conferma prima della scrittura). La chat AI può proporre piani, ma non può dichiararli approvati: verifica sempre le richieste nel Centro approvazioni. Nessun acquisto, invio o modifica viene eseguito dalla sola risposta della chat. La dettatura dipende dal browser Android.</p>
         </article>
       </section>
       <footer>JARVIS v4 · Cloud Command Center · Azioni importanti soggette ad approvazione</footer>
@@ -334,9 +334,18 @@ function parseJarvisCoreCommand(message){
  if(project)return {kind:'project',title:project[1].trim()};
  const task=input.match(/^(?:aggiungi|crea|creami)\s+(?:(?:una|un)\s+)?(?:nuova\s+)?(?:attivit[àa]|task)\s*[:\-]?\s+(.+)$/i);
  if(task)return {kind:'task',title:task[1].trim()};
+ const planning=input.match(/^(?:pianifica|prepara (?:un )?piano per|organizza)s*[:\-]?\s+(.+)$/i);
+ if(planning)return {kind:'plan',title:planning[1].trim()};
  return null;
 }
 async function runJarvisCoreCommand(command){
+ if(command.kind==='plan'){
+  if(command.title.length<5||command.title.length>900)return 'Descrivi un obiettivo tra 5 e 900 caratteri. Nessuna modifica eseguita.';
+  const result=await post('/api/plan',{goal:command.title});
+  if(result.status!=='proposal'||!Array.isArray(result.steps)||result.steps.length<1||result.requires_approval!==true)throw Error('Il server non ha restituito una bozza verificabile.');
+  const points=result.steps.slice(0,10).map((x,i)=>(i+1)+'. '+String(x.title||'Passaggio da definire')).join('\n');
+  return 'Bozza operativa per «'+command.title+'»:\n'+points+'\nNessuna attività creata: è una proposta da revisionare nel Planner.';
+ }
  if(command.title.length<2||command.title.length>160)return 'Il titolo deve avere tra 2 e 160 caratteri. Non ho creato nulla.';
  if(command.kind==='project'){
   if(!state.availability.projects)throw Error('Elenco progetti Cloud non disponibile: nessuna modifica eseguita.');
