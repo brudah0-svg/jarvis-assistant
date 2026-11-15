@@ -148,7 +148,7 @@ try{
  });
  page.on('dialog',async dialog=>{
   dialogs.push({type:dialog.type(),message:dialog.message()});
-  if(dialog.message().includes('Confermi la creazione del progetto')){await dialog.dismiss();return}
+  if(dialog.message().includes('Confermi la creazione del progetto')){if(dialog.message().includes('Sito web per elettricista'))await dialog.accept();else await dialog.dismiss();return}
   if(dialog.message().includes('Creare l’attività')){await dialog.accept();return}
   if(dialog.message().startsWith('Importare nel Cloud')){
    if(dialogs.filter(d=>d.message.startsWith('Importare nel Cloud')).length===1)await dialog.dismiss();
@@ -222,6 +222,22 @@ try{
  await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Creazione annullata'),{timeout:15000});
  assert.equal(writes.filter(w=>w.path==='/api/projects').length,projectWritesBefore,'Denied project create must not mutate D1');
  assert(!projects.some(p=>p.name==='Da non salvare'));
+ // The colloquial command in the real Android screenshot must be routed to D1, not advisory AI.
+ const naturalBefore=writes.filter(w=>w.path==='/api/projects').length;
+ const aiBeforeNatural=writes.filter(w=>w.path==='/api/ai-chat').length;
+ await page.locator('#chatInput').fill('Ciao Jarvis mi crei un progetto per un elettricista per un sito web di un elettricista');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Progetto “Sito web per elettricista” creato e confermato dal server Cloud.'),{timeout:15000});
+ assert.equal(writes.filter(w=>w.path==='/api/projects').length,naturalBefore+1,'Colloquial project creation must make a verified D1 write');
+ assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,aiBeforeNatural,'Colloquial project command must not go to advisory AI');
+ assert(projects.some(p=>p.name==='Sito web per elettricista'));
+ assert((await page.locator('#projects').textContent()).includes('Sito web per elettricista'),'Newly created project must appear in the list');
+ const createdBeforeDup=writes.filter(w=>w.path==='/api/projects').length;
+ await page.locator('#chatInput').fill('Ciao Jarvis mi crei un progetto per un elettricista per un sito web di un elettricista');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Un progetto con questo nome esiste già'),{timeout:15000});
+ assert.equal(writes.filter(w=>w.path==='/api/projects').length,createdBeforeDup,'Repeated request must not create duplicate');
+
  // A task must target an explicitly selected existing Cloud project; no guessing.
  await page.locator('#activeProject').selectOption('cloud-base');
  const aiCallsBefore=writes.filter(w=>w.path==='/api/ai-chat').length;
