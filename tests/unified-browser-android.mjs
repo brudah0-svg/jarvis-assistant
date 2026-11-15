@@ -55,6 +55,7 @@ const server=createServer(async(req,res)=>{
    const memory={id:'created-memory-'+(++counter),content:body.content,category:body.category,created_at:'2026-11-15'};
    memories.push(memory);return json(res,201,{status:'created',memory});
   }
+  if(path==='/api/plan'&&req.method==='POST')return json(res,200,{status:'proposal',goal:body.goal,steps:[{order:1,title:'Preparare il prototipo'},{order:2,title:'Collaudare su Android'}],requires_approval:true,notice:'Bozza sintetica senza scritture'});
   if(path==='/api/chat-history'&&req.method==='POST')return json(res,201,{status:'created'});
   if(path==='/api/ai-chat'&&req.method==='POST')return json(res,200,{answer:'Risposta sintetica, nessuna AI reale utilizzata.'});
   return json(res,404,{error:'No synthetic route'});
@@ -162,6 +163,14 @@ try{
  await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('nessun duplicato creato'),{timeout:15000});
  assert.equal(writes.filter(w=>w.path==='/api/tasks'&&w.method==='POST').length,coreTaskCount,'Repeated core task must not duplicate');
  assert.equal(proposals.length,0,'Chat core commands must not authorize proposals');
+ const beforePlanWrites=writes.filter(w=>w.path==='/api/projects'||w.path==='/api/tasks').length;
+ await page.locator('#chatInput').fill('Pianifica: costruire il mio assistente AI');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Bozza operativa per'),{timeout:15000});
+ assert(writes.some(w=>w.path==='/api/plan'&&w.body.goal==='costruire il mio assistente AI'),'Planning must use existing same-origin API');
+ assert.equal(writes.filter(w=>w.path==='/api/projects'||w.path==='/api/tasks').length,beforePlanWrites,'Planning cannot write projects or tasks');
+ assert.equal(proposals.length,0);
+
  assert.deepEqual(jsErrors,[],'No unhandled JS errors');
  assert.deepEqual(externalNetwork,[],'No external domains were contacted');
  mkdirSync('dist/browser-artifacts',{recursive:true});
