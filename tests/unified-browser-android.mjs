@@ -269,6 +269,21 @@ try{
  assert.equal(await page.locator('#siteDownload').isEnabled(),true);
  assert((await page.locator('#sitePreview').getAttribute('srcdoc')).includes('Sito generato e salvato'));
  assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0);
+ // Natural-language read-only recovery: no separate dashboard buttons or writes.
+ const writesBeforeLookup=writes.length;
+ await page.locator('#chatInput').fill('Hey Jarvis, mostrami i lavori');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Ho trovato 2 incarichi'),{timeout:15000});
+ assert.equal(writes.filter(w=>w.path==='/api/ai-chat'&&w.body.message?.includes('mostrami i lavori')).length,0,'Job status must use D1, not AI claims');
+ assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0);
+ await page.locator('#chatInput').fill('Hey Jarvis, apri l’ultimo sito');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Ho recuperato il tuo sito completato più recente'),{timeout:15000});
+ assert.equal(await page.locator('#conversation iframe[sandbox=""]').count(),1,'Chat must show private recovered preview without extra clicks');
+ assert.equal(await page.locator('#conversation iframe[sandbox=""]').first().getAttribute('referrerpolicy'),'no-referrer');
+ assert.equal(writes.length,writesBeforeLookup+4,'Only user/assistant chat-history persistence is permitted for read-only requests');
+ assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0);
+
 
  // Tap-to-talk: a recognized Italian phrase submits to the existing AI path;
  // only then does JARVIS speak the server-supplied reply.
