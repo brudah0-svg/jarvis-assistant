@@ -232,6 +232,15 @@ Cost target: use existing free-tier services where practical, without claiming t
 - Release evidence and scope: [SITE_BUILDER_RELEASE_2026-11-15.md](SITE_BUILDER_RELEASE_2026-11-15.md).
 - **Not full JARVIS:** multi-agent task runner, real deployment automation, natural voice-to-voice, persistent website jobs and autonomous self-upgrade are not yet delivered. Continue work on those core capabilities rather than claiming completion.
 
+## Operational core: persistent website drafts online (2026-11-15)
+
+- PR #47 merged; authenticated Website Builder now includes optional save of generated standalone website HTML to new additive D1 table `site_drafts`, a 30-draft cap without deletion, a private list and a per-draft read-only recovery endpoint.
+- Live Worker version `4cd57d3f-38ac-459e-8c81-a1c4b737dcc6`, SHA-256 `483f39ff34290d475d751c56da4c468e7b5ea439e6ae809f123ec18f8495cbb8` matches the CI-tested candidate. Cloudflare Access, all seven bindings and legacy routes preserved. Previous Worker `904629dc-9ffc-48e0-b313-3e6f4aa3820a` remains the rollback reference.
+- Additive D1 migration succeeded, `quick_check=ok`, 2 existing projects and 20 tasks unchanged, 0 drafts immediately after release. No public website publish or account mutation.
+- Browser/mobile synthetic and Worker D1 contract tests passed. No authenticated physical Android AI generation or persisted draft reload has yet been observed.
+- Evidence: [SITE_DRAFTS_RELEASE_2026-11-15.md](SITE_DRAFTS_RELEASE_2026-11-15.md). A new encrypted independent off-device backup including the new table remains to be verified.
+- This is forward progress on the core product, but **not** proof that full voice-to-autonomous-public-website workflows, persistent agent orchestration and self-upgrades are complete.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
