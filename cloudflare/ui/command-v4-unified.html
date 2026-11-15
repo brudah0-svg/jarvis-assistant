@@ -391,7 +391,7 @@ function parseJarvisCoreCommand(message){
  if(/^(?:(?:mostra(?:mi)?|elenca|controlla)\s+)?(?:i\s+)?(?:miei\s+)?(?:lavori|incarichi)(?:\s+(?:dei\s+)?siti)?[.!?]?$/i.test(input)
    ||/^(?:a\s+che\s+punto\s+sono\s+)?(?:i\s+)?(?:miei\s+)?(?:siti\s+in\s+lavorazione)[.!?]?$/i.test(input))
    return {kind:'site-status'};
- if(/^(?:(?:apri|mostra(?:mi)?|riapri|recupera)\s+)(?:(?:il\s+)?(?:mio\s+)?)?(?:ultimo|più\s+recente)\s+(?:sito|lavoro|incarico)(?:\s+(?:creato|completato))?[.!?]?$/i.test(input))
+ if(/^(?:(?:apri|mostra(?:mi)?|riapri|recupera)\s+)(?:(?:il\s+|l['’]\s*)?(?:mio\s+)?)?(?:ultimo|più\s+recente)\s+(?:sito|lavoro|incarico)(?:\s+(?:creato|completato))?[.!?]?$/i.test(input))
    return {kind:'site-open'};
 
  const project=input.match(/^(?:crea|creami|avvia)\s+(?:(?:un|il)\s+)?(?:nuovo\s+)?progetto\s*[:\-]?\s+(.+)$/i);
