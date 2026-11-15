@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 
 execFileSync(process.execPath,['scripts/build-v4-staging-next.mjs'],{stdio:'inherit'});
 const base=readFileSync('dist/jarvis-v4-staging-next.mjs','utf8');
-const pinned=JSON.parse(readFileSync('cloudflare/STAGING_V4_DEPLOYMENT.json','utf8'));
+const pinned=JSON.parse(readFileSync('cloudflare/STAGING_V4_DEPLOYMENT_PATCH.json','utf8'));
 const sha=s=>createHash('sha256').update(s,'utf8').digest('hex');
 assert.equal(sha(base),pinned.source_sha256,'Start from current verified isolated staging Worker');
 const start='const STAGING_V4_HTML=';
