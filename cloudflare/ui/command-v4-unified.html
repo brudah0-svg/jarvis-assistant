@@ -347,6 +347,11 @@ $('chatForm').onsubmit=async e=>{
    const result=await post('/api/ai-chat',{message});
    const answer=result.answer||'Il modello non ha restituito una risposta.';
    say(answer);
+   if(result.read_only===true&&result.operations_executed===false&&result.approval_granted_by_chat===false){
+    say('Stato verificato: risposta consultiva, nessuna operazione su progetti, attività o approvazioni eseguita. Proposte in attesa nel Cloud: '+(Number.isInteger(result.pending_proposals)?result.pending_proposals:'non disponibile')+'.','system');
+   }else{
+    say('Attenzione: il server non ha confermato il carattere consultivo della risposta. Verifica le operazioni nel Centro approvazioni prima di considerarle eseguite.','system');
+   }
    try{
     await post('/api/chat-history',{role:'assistant',content:answer});
    }catch(historyError){say('La risposta AI è disponibile, ma lo storico non è stato salvato completamente: '+historyError.message)}
