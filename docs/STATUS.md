@@ -37,6 +37,15 @@
 - The integration is **source code only**, not the deployed production Worker nor an end-to-end browser or remote integration verification.
 - The staging snapshot remains pinned to the previously deployed version; no silent staging or production update was performed.
 
+## Cloudflare live audit and regression remediation (2026-11-15)
+
+- Confirmed exact SHA-256 parity against the Cloudflare API for deployed production `89f66668-175c-41ce-926c-b45aceef1f06` and staging `a43a3a07-4e54-4577-a775-3a11db96258e`.
+- Staging D1 `PRAGMA quick_check` returned `ok`; the isolated fixture remains at 1 project and 1 task; `DB` bindings map to separate databases in production and staging.
+- Observed actual scheduled staging regression result for **the current staging version**: `9/10 failed`. The failed check is `patch_block`; the staging v4 wrapper correctly rejects `PATCH` with HTTP 405, but the pinned production regression code expects HTTP 404.
+- GitHub PR #14 fixed this mismatch **only in the generated v4 release candidate**, accepting both 404 and 405 as blocked PATCH responses. Original deployed Worker source and manifest remain unchanged. Isolated generated candidate tests passed. There has been **no Cloudflare redeployment**.
+- Recent staging auto-check was `attention` (6/7), and production autonomous health check `attention` (6/9). The last independent off-account backup remains unverified. A fresh current-version regression remains required after any future backend deployment.
+- **Release gate remains blocked.** Source parity, CI tests, and a historical passing 10/10 cannot substitute for a new runtime test, verified independent backup, current candidate provenance, Android acceptance and explicit production release approval.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
