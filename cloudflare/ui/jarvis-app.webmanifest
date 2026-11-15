@@ -1,0 +1,11 @@
+{
+  "name": "JARVIS — Centro di comando unificato",
+  "short_name": "JARVIS",
+  "id": "/jarvis-unified",
+  "start_url": "/jarvis-unified",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#07111f",
+  "background_color": "#050b14",
+  "description": "Dashboard, progetti, attività, memoria e AI nello stesso ambiente protetto"
+}
