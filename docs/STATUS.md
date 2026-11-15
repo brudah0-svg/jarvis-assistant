@@ -223,6 +223,15 @@ The owner's explicit development order is **(1) finish a useful operative JARVIS
 
 Cost target: use existing free-tier services where practical, without claiming that future Cloudflare usage is guaranteed free.
 
+## Operational core: Website Builder deployed (2026-11-15)
+
+- PR #45 merged; first user-facing construction workflow deployed to protected JARVIS `/jarvis-unified`. User can brief a single-page website via text or supported voice recognition, preview AI-generated static HTML in a sandboxed iframe and download a standalone `sito-jarvis.html`.
+- Live Worker `904629dc-9ffc-48e0-b313-3e6f4aa3820a`; deployed source SHA-256 `8317e7374ea4727b76b1c09643ea58323ff13b2b6fbd4fceb44212a930d7c646` exactly matches GitHub CI-tested candidate. Previous `0700f5dd-40c7-4cce-9f46-dffbd515f3db` retained for rollback.
+- GitHub Actions real Worker contract and Android-like browser CI passed. AI calls were synthetic in CI; actual Workers AI content generation and Android voice require physical authenticated acceptance.
+- No publishing or cost-related actions, no D1 schema writes; production D1 integrity checked, 2 projects and 20 tasks unchanged, Access and all seven bindings preserved.
+- Release evidence and scope: [SITE_BUILDER_RELEASE_2026-11-15.md](SITE_BUILDER_RELEASE_2026-11-15.md).
+- **Not full JARVIS:** multi-agent task runner, real deployment automation, natural voice-to-voice, persistent website jobs and autonomous self-upgrade are not yet delivered. Continue work on those core capabilities rather than claiming completion.
+
 ## Not verified / outstanding
 
 - First live executions of the new scheduled health/backup/staging cycles: last observed counters were zero.
