@@ -7,3 +7,5 @@ The check rejects a published page missing strict CSP restrictions or containing
 A GitHub deployment success alone proves only that Pages published a build. This workflow is intended to verify what is actually served. A passing result does not verify a physical Android offline file, full D1 restore or remote Cloudflare staging 10/10 regression.
 
 GitHub Actions usage remains subject to repository/account plan limits. No paid Cloudflare service is introduced.
+
+The GitHub Actions job also runs on changes to the verifier or parity workflow pushed to `main`, because GitHub's managed Pages deployment may not emit the named `workflow_run` event consistently. The public check retries up to five times to allow for deployment propagation. A failure stays visible as a failed workflow rather than being presented as a verified deployment.

@@ -1,5 +1,12 @@
 name: JARVIS live backup verifier publication
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backup-verify-offline.html'
+      - 'tests/live-backup-pages-parity.mjs'
+      - '.github/workflows/live-backup-pages.yml'
   workflow_run:
     workflows:
       - pages build and deployment
@@ -12,7 +19,7 @@ permissions:
 
 jobs:
   read-only-publication-smoke:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
