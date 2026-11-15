@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {Script} from 'node:vm';
+const html=readFileSync('backup-verify-offline.html','utf8');
+assert(html.includes("connect-src 'none'"),'Offline verifier must block every outgoing connection');
+assert(html.includes("default-src 'none'"),'Offline page must reject external assets by default');
+assert(html.includes("form-action 'none'"),'Offline page must not submit files');
+assert(!/<script[^>]+src\s*=|<link[^>]+href\s*=/i.test(html),'No external script or linked assets');
+const script=html.match(/<script>([\s\S]*?)<\/script>/);
+assert(script,'Inline verifier is required');
+new Script(script[1],{filename:'offline-backup-verifier'});
+for(const literal of ['AES-GCM','PBKDF2','310000','schema_sha256','rows_sha256','plaintext_sha256','verified!==true','m.id!==expectedId'])assert(script[1].includes(literal),'Missing verification invariant: '+literal);
+assert(!/\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\bsendBeacon\s*\(/.test(script[1]),'Offline page must never transmit backup or password');
+console.log('Standalone offline backup verifier source safety passed: crypto, snapshot digests, no network, no remote scripts.');
