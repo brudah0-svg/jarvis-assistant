@@ -1,12 +1,12 @@
 {
   "format": "jarvis-worker-source-provenance-v1",
   "exported_at": "2026-11-14",
-  "note": "Exact Cloudflare Worker source snapshots, not a deployment authorization. Update hashes and recorded version IDs whenever source changes.",
+  "note": "Checked-in source SHA-256 manifests. Worker version IDs identify the deployment on which this source was based, not authorization to deploy source changes; production changes must pass release validation.",
   "workers": {
     "cloudflare/workers/jarvis-backend.mjs": {
       "cloudflare_name": "jarvis-backend",
       "version_id": "89f66668-175c-41ce-926c-b45aceef1f06",
-      "sha256": "15f9b6ca957c2999208efd65ce5918e9579bc7d6006faf2035410d796acfee17"
+      "sha256": "921d28c66232e86e4a0e86cf105fed98fb656d7c2940a6853cdeb6a89c8ad9cc"
     },
     "cloudflare/workers/jarvis-staging.mjs": {
       "cloudflare_name": "jarvis-staging",
