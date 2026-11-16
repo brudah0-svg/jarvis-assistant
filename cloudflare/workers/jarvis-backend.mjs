@@ -968,6 +968,41 @@ if(path==="/api/system-check" && method==="GET"){
         return json({status:"updated",task:await env.DB.prepare("SELECT * FROM tasks WHERE id=?").bind(id).first()},200,origin);
       }catch{return json({error:"Unable to update task"},500,origin)}
     }
+
+    // AutoImprove status is authoritative D1 evidence, never a claim from advisory AI.
+    if(path==="/api/autoimprove/status"&&method==="GET"){
+      if(!env.DB)return json({error:"Database unavailable"},503,origin);
+      try{
+        const all=await env.DB.prepare("SELECT id,goal,status,run_id,started_at,finished_at,result FROM jarvis_agent_improve_jobs ORDER BY rowid DESC LIMIT 12").all();
+        const records=all.results||[];
+        const latest=records[0]||null;
+        const queue=await env.DB.prepare("SELECT COUNT(*) AS total FROM memories WHERE category='JARVIS_AUTOIMPROVE_TASK'").first();
+        return json({status:"ok",latest,history:records,requests_recorded:Number(queue?.total||0),production_modified:false,automatic_deploy:false},200,origin);
+      }catch{return json({error:"AutoImprove status not available"},503,origin)}
+    }
+    // An explicit retry is permitted only for a real failed/no_change job. Hard cap:
+    // one active job per goal, two additional retries across the lifetime of a goal.
+    if(path==="/api/autoimprove/retry"&&method==="POST"){
+      if(!env.DB)return json({error:"Database unavailable"},503,origin);
+      try{
+        const bodyText=await request.text();
+        if(bodyText.length>1000)return json({error:"Payload too large"},413,origin);
+        let body;try{body=JSON.parse(bodyText)}catch{return json({error:"Invalid JSON"},400,origin)}
+        if(!body||typeof body.job_id!=="string"||!/^[0-9a-f-]{36}$/i.test(body.job_id))return json({error:"Invalid job ID"},400,origin);
+        const previous=await env.DB.prepare("SELECT id,goal,status FROM jarvis_agent_improve_jobs WHERE id=?").bind(body.job_id).first();
+        if(!previous)return json({error:"Job not found"},404,origin);
+        if(!["no_change","failed"].includes(previous.status))return json({error:"Only completed failed jobs can be retried"},409,origin);
+        const counts=await env.DB.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status IN ('queued','claimed') THEN 1 ELSE 0 END) AS active FROM jarvis_agent_improve_jobs WHERE goal=?").bind(previous.goal).first();
+        if(Number(counts?.active||0)>0)return json({error:"An improvement attempt is already active"},409,origin);
+        if(Number(counts?.total||0)>=3)return json({error:"Retry limit reached: maximum three attempts per goal"},429,origin);
+        const today=await env.DB.prepare("SELECT COUNT(*) AS total FROM jarvis_agent_improve_jobs WHERE date(started_at)=date('now')").first();
+        if(Number(today?.total||0)>=3)return json({error:"Daily improvement quota reached"},429,origin);
+        const id=crypto.randomUUID();
+        const write=await env.DB.prepare("INSERT INTO jarvis_agent_improve_jobs(id,goal,status,result) SELECT ?,?,'queued',? WHERE (SELECT COUNT(*) FROM jarvis_agent_improve_jobs WHERE goal=?)<3 AND NOT EXISTS(SELECT 1 FROM jarvis_agent_improve_jobs WHERE goal=? AND status IN ('queued','claimed'))").bind(id,previous.goal,"retry_of:"+body.job_id,previous.goal,previous.goal).run();
+        if(write.meta?.changes!==1)return json({error:"Retry blocked: quota or active job"},409,origin);
+        return json({status:"queued",job:{id,goal:previous.goal,status:"queued"},production_modified:false,automatic_deploy:false},201,origin);
+      }catch{return json({error:"Retry not available"},503,origin)}
+    }
     if (path === "/api/memory" && method === "GET") {
       if (!env.DB) return json({ error: "Database unavailable" }, 503, origin);
       try {
