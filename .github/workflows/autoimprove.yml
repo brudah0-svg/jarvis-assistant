@@ -44,6 +44,8 @@ jobs:
         run: |
           node tests/autoimprove-contract.mjs
           node tests/autoimprove-patch-canary.mjs
+      - name: Verify short-lived GitHub OIDC is available before the agent starts
+        run: test -n "$ACTIONS_ID_TOKEN_REQUEST_URL" && test -n "$ACTIONS_ID_TOKEN_REQUEST_TOKEN"
       - name: Install synthetic Android browser
         run: |
           npm install --no-save --no-audit --no-fund playwright@1.56.1
