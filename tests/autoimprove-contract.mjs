@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {safePatch,extractPatch,hash,validateParserWithNode,TARGET} from '../scripts/autoimprove-runner.mjs';
+import {safePatch,extractPatch,hash,validateParserWithNode,verifyBehaviorChange,TARGET} from '../scripts/autoimprove-runner.mjs';
 import {trustClaims} from '../cloudflare/workers/jarvis-autoimprove-ai.mjs';
 import {readFileSync} from 'node:fs';
 
@@ -17,6 +17,13 @@ const candidate=safePatch(original,{find,replace:valid,reason:'Normalize short A
 assert(candidate.changed&&candidate.source!==original);
 assert.equal(candidate.original_sha256,hash(original));
 assert.equal(validateParserWithNode(candidate.source),true);
+
+const supported=String.raw`micr\s*(?:è|e|é)?\s*`;
+const fix=safePatch(original,{find,replace:supported,reason:'Support alternative acute accent'});
+assert.equal(validateParserWithNode(fix.source),true);
+assert.equal(verifyBehaviorChange(original,fix.source).regressions_checked,10,'Only approved ASR improvement may pass');
+assert.throws(()=>verifyBehaviorChange(original,candidate.source),/does not improve the target ASR edge case/,'Cosmetic regex changes must not be proposed as improvements');
+
 assert.equal(original.includes(valid),false);
 assert.deepEqual(safePatch(original,{find,replace:find,reason:'nothing'}),{changed:false,reason:'No change'});
 assert.throws(()=>safePatch(original,{find,replace:'fetch("https://evil")',reason:'malicious'}),/Forbidden/);
