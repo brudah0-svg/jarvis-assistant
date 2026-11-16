@@ -14,6 +14,7 @@ const worker=(await import(pathToFileURL(resolve('dist/jarvis-backend-unified-ca
 const projects=[{id:'cloud-base',name:'Progetto già nel Cloud',description:'Sintetico',status:'active'}];
 const tasks=[{id:'task-base',project_id:'cloud-base',title:'Attività Cloud',status:'pending'}];
 const memories=[{id:'memory-base',content:'Memoria Cloud',category:'Altro',created_at:'2026-11-15'}];
+const improveJobs=[];
 const proposals=[];
 const savedDrafts=[];
 const siteJobs=[];
@@ -57,7 +58,8 @@ const server=createServer(async(req,res)=>{
    if(path==='/api/proposals')return json(res,200,{proposals});
    if(path==='/api/autonomy/status')return json(res,200,{status:'healthy',latest:{checks_passed:5,checks_total:5},pending_approvals:[],automatic_publication:false});
     if(path==='/api/autonomy/remediations')return json(res,200,{status:'ok',cases:[{state:'needs_review',title:'Synthetic QA finding'}],automatic_execution:false});
-    if(path==='/api/chat-history')return json(res,200,{messages:[]});
+    if(path==='/api/autoimprove/status')return json(res,200,{status:'ok',latest:improveJobs.at(-1)||null,history:[...improveJobs].reverse(),requests_recorded:memories.filter(m=>m.category==='JARVIS_AUTOIMPROVE_TASK').length,production_modified:false,automatic_deploy:false});
+   if(path==='/api/chat-history')return json(res,200,{messages:[]});
    return json(res,404,{error:'Route unavailable'});
   }
   if(req.method!=='POST'&&req.method!=='PATCH')return json(res,405,{error:'Method disabled'});
@@ -112,6 +114,15 @@ const server=createServer(async(req,res)=>{
   if(path==='/api/plan'&&req.method==='POST')return json(res,200,{status:'proposal',goal:body.goal,steps:[{order:1,title:'Preparare il prototipo'},{order:2,title:'Collaudare su Android'}],requires_approval:true,notice:'Bozza sintetica senza scritture'});
   if(path==='/api/executor/run'&&req.method==='POST')return json(res,200,{status:'completed',project_id:body.project_id,total_checks:5,passed:4,warnings:1,read_only:true,automatic_fix_applied:false});
    if(path==='/api/self-improvement/prepare'&&req.method==='POST')return json(res,200,{status:'ok',project_id:body.project_id,automatic_changes:0,generated:1,proposals:[{id:'synthetic-safe-proposal'}]});
+   if(path==='/api/autoimprove/retry'&&req.method==='POST'){
+     const previous=improveJobs.find(x=>x.id===body.job_id);
+     if(!previous||!['no_change','failed'].includes(previous.status))return json(res,409,{error:'Only failed completed jobs'});
+     if(improveJobs.some(x=>x.status==='queued'||x.status==='claimed'))return json(res,409,{error:'Active attempt'});
+     if(improveJobs.filter(x=>x.goal===previous.goal).length>=3)return json(res,429,{error:'Maximum retries'});
+     const id='00000000-0000-4000-8000-'+String(++counter).padStart(12,'0');
+     const job={id,goal:previous.goal,status:'queued',result:'retry_of:'+previous.id};improveJobs.push(job);
+     return json(res,201,{status:'queued',job,production_modified:false,automatic_deploy:false});
+   }
    if(path==='/api/chat-history'&&req.method==='POST')return json(res,201,{status:'created'});
   if(path==='/api/ai-chat'&&req.method==='POST')return json(res,200,{answer:'Risposta sintetica, nessuna AI reale utilizzata.'});
   return json(res,404,{error:'No synthetic route'});
@@ -477,6 +488,8 @@ try{
  await page.locator('#chatForm button[type=submit]').click();
  await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Richiesta di automiglioramento registrata'),{timeout:15000});
  assert.equal(memories.filter(x=>x.category==='JARVIS_AUTOIMPROVE_TASK').length,improvementBefore+1,'AutoImprove must queue one job');
+ // Simulate the scheduled GitHub agent accepting the request in its own data store.
+ improveJobs.push({id:'00000000-0000-4000-8000-000000000010',goal:memories.find(m=>m.category==='JARVIS_AUTOIMPROVE_TASK').content,status:'queued',result:''});
  assert.equal(projects.length,improvementProjects,'AutoImprove may not change project records');
  assert.equal(tasks.length,improvementTasks,'AutoImprove may not change tasks');
  await page.locator('#chatInput').fill('Hey Jarvis, migliorati automaticamente');
@@ -487,7 +500,7 @@ try{
  const aiBeforeRedmi=writes.filter(w=>w.path==='/api/ai-chat').length;
  await page.locator('#chatInput').fill('Ehi Jarvis migliorati autonomamente');
  await page.locator('#chatForm button[type=submit]').click();
- await page.waitForFunction(()=>[...document.querySelectorAll('#conversation .bubble.jarvis')].at(-1)?.textContent?.includes('già presente nella coda'),{timeout:15000});
+ await page.waitForFunction(()=>[...document.querySelectorAll('#conversation .bubble.jarvis')].at(-1)?.textContent?.includes('La richiesta risulta in coda'),{timeout:15000});
  assert.equal(memories.filter(x=>x.category==='JARVIS_AUTOIMPROVE_TASK').length,improvementBefore+1,'Redmi command must route to existing queue');
  assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,aiBeforeRedmi,'No advisory AI answer for Redmi autoimprovement command');
 
@@ -500,7 +513,7 @@ try{
   await page.locator('#chatForm button[type=submit]').click();
   await page.waitForFunction(previous=>document.querySelectorAll('#conversation .bubble.jarvis').length>previous,previousBubbles,{timeout:15000});
   const lastJarvis=await page.locator('#conversation .bubble.jarvis').last().textContent();
-  assert.match(lastJarvis,/già presente nella coda/i,'ASR artifact must route to existing job: '+transcript);
+  assert.match(lastJarvis,/La richiesta risulta in coda/i,'ASR artifact must route to existing job: '+transcript);
   assert.equal(memories.filter(x=>x.category==='JARVIS_AUTOIMPROVE_TASK').length,queuedBefore,'ASR artifact cannot duplicate job');
   assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,consultedBefore,'ASR artifact cannot go to advisory AI');
  }
@@ -511,6 +524,30 @@ try{
  await page.waitForFunction(()=>[...document.querySelectorAll('#conversation .bubble.jarvis')].at(-1)?.textContent?.includes('Risposta sintetica'),{timeout:15000});
  assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,beforeAnother+1,'Questions remain read-only AI');
  assert.equal(memories.filter(x=>x.category==='JARVIS_AUTOIMPROVE_TASK').length,improvementBefore+1,'No new job from information question');
+ // Real attempt completed without a safe patch: the UI must not call it "still queued".
+ improveJobs.at(-1).status='no_change';
+ improveJobs.at(-1).result='No safe verified patch. Patch size outside limits';
+ const statusStart=await page.locator('#conversation .bubble.jarvis').count();
+ await page.locator('#chatInput').fill('Jarvis, stato automiglioramento');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(previous=>document.querySelectorAll('#conversation .bubble.jarvis').length>previous,statusStart,{timeout:15000});
+ assert.match(await page.locator('#conversation .bubble.jarvis').last().textContent(),/concluso senza modifiche/);
+ const beforeRepeat=await page.locator('#conversation .bubble.jarvis').count();
+ await page.locator('#chatInput').fill('Jarvis, migliorati autonomamente');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(previous=>document.querySelectorAll('#conversation .bubble.jarvis').length>previous,beforeRepeat,{timeout:15000});
+ assert.match(await page.locator('#conversation .bubble.jarvis').last().textContent(),/già elaborata: esito no_change/);
+ const beforeRetry=improveJobs.length;
+ await page.locator('#chatInput').fill('Jarvis, riprova a migliorarti');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>[...document.querySelectorAll('#conversation .bubble.jarvis')].at(-1)?.textContent?.includes('Nuovo tentativo di automiglioramento accodato'),{timeout:15000});
+ assert.equal(improveJobs.length,beforeRetry+1,'Explicit retry must queue exactly one attempt');
+ assert.equal(improveJobs.at(-1).status,'queued');
+ const beforeDuplicateRetry=improveJobs.length;
+ await page.locator('#chatInput').fill('Jarvis, riprova a migliorarti');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>[...document.querySelectorAll('#conversation .bubble.jarvis')].at(-1)?.textContent?.includes('Non è possibile accodare un nuovo retry'),{timeout:15000});
+ assert.equal(improveJobs.length,beforeDuplicateRetry,'Cannot queue a second retry while active');
  assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0,'AutoImprove command may not deploy or invoke GitHub directly');
  assert.deepEqual(jsErrors,[],'No unhandled JS errors');
  assert.deepEqual(externalNetwork,[],'No external domains were contacted');
