@@ -18,8 +18,9 @@ assert(candidate.changed&&candidate.source!==original);
 assert.equal(candidate.original_sha256,hash(original));
 assert.equal(validateParserWithNode(candidate.source),true);
 
-const supported=String.raw`micr\s*(?:è|e|é)?\s*`;
-const fix=safePatch(original,{find,replace:supported,reason:'Support alternative acute accent'});
+const supported=String.raw`mi\s*cr[eè]?\s*(?:è|e|é)?\s*`;
+const edgeFind=String.raw`mi\s*cr[eè]?\s*(?:è|e)?\s*`;
+const fix=safePatch(original,{find:edgeFind,replace:supported,reason:'Support alternative acute accent in first ASR branch'});
 assert.equal(validateParserWithNode(fix.source),true);
 assert.equal(verifyBehaviorChange(original,fix.source).regressions_checked,10,'Only approved ASR improvement may pass');
 assert.throws(()=>verifyBehaviorChange(original,candidate.source),/does not improve the target ASR edge case/,'Cosmetic regex changes must not be proposed as improvements');
