@@ -21,6 +21,14 @@ assert.equal(validateParserWithNode(candidate.source),true);
 const supported=String.raw`mi\s*cr[eè]?\s*(?:è|e|é)?\s*`;
 const edgeFind=String.raw`mi\s*cr[eè]?\s*(?:è|e)?\s*`;
 const fix=safePatch(original,{find:edgeFind,replace:supported,reason:'Support alternative acute accent in first ASR branch'});
+const chosen=extractPatch(JSON.stringify({operation_id:'asr-acute-accent-v1',reason:'Handle micr é ASR'}));
+assert.equal(chosen.catalogue_id,'asr-acute-accent-v1');
+assert.equal(chosen.find,edgeFind);
+assert.equal(chosen.replace,supported);
+assert.equal(verifyBehaviorChange(original,safePatch(original,chosen).source).regressions_checked,10);
+assert.throws(()=>extractPatch(JSON.stringify({operation_id:'dangerous-command',reason:'try'})),/Unknown improvement operation/);
+assert.throws(()=>extractPatch(JSON.stringify({operation_id:'asr-acute-accent-v1',reason:1})),/Invalid proposal fields/);
+
 assert.equal(validateParserWithNode(fix.source),true);
 assert.equal(verifyBehaviorChange(original,fix.source).regressions_checked,10,'Only approved ASR improvement may pass');
 assert.throws(()=>verifyBehaviorChange(original,candidate.source),/does not improve the target ASR edge case/,'Cosmetic regex changes must not be proposed as improvements');
