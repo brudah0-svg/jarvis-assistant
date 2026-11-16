@@ -4,6 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
+import {runInNewContext} from 'node:vm';
 
 // Deliberately small, auditable patch surface: only the noisy Italian ASR parser.
 export const TARGET='cloudflare/ui/command-v4-unified.html';
@@ -52,6 +53,35 @@ export function safePatch(original,p){
  if(diffLen>80)throw Error('Too large ASR change');
  return {changed:true,source:updated,reason:p.reason.slice(0,250),original_sha256:hash(original),updated_sha256:hash(updated)};
 }
+function makeParser(html,vm){
+ const start=html.indexOf('function parseJarvisCoreCommand(message){');
+ const end=html.indexOf('function showSitePreviewInChat(',start);
+ if(start<0||end<=start)throw Error('Parser source boundaries missing');
+ return vm('let pendingVoiceAction=null;\n'+html.slice(start,end)+'\nparseJarvisCoreCommand;',{}, {timeout:1000});
+}
+export function verifyBehaviorChange(before,after){
+ const a=makeParser(before,runInNewContext),b=makeParser(after,runInNewContext);
+ const baseline=[
+  'Hey Jarvis micr è un sito un sito web per un idraulico per piacere',
+  'Hey Jarvis, creami un sito web per Pinco Pallo',
+  'Jarvis, migliorati autonomamente',
+  'e Jarvis migliorati autonomamente',
+  'Jarvis è migliorati autonomamente',
+  'Jarvis, stato automiglioramento',
+  'Jarvis, riprova a migliorarti',
+  'Jarvis, quanto costa un sito web per un idraulico?',
+  'Ciao Jarvis mi crei un progetto per il sito di un elettricista',
+  'Jarvis, apri l’ultimo sito multipagina'
+ ];
+ for(const utterance of baseline){
+  if(JSON.stringify(a(utterance))!==JSON.stringify(b(utterance)))throw Error('Command regression: '+utterance);
+ }
+ const edge='Hey Jarvis micr é un sito web per un idraulico';
+ const old=a(edge),now=b(edge);
+ if(old?.kind==='website')throw Error('Edge case already supported');
+ if(now?.kind!=='website'||!String(now.title).includes('idraulico'))throw Error('Patch does not improve the target ASR edge case');
+ return {regressions_checked:baseline.length,new_case:edge};
+}
 export function validateParserWithNode(html){
  const open=html.indexOf('<script>"use strict";');
  const close=html.indexOf('</script>',open);
@@ -75,7 +105,7 @@ async function getIdentity(){
  const data=await r.json();if(typeof data.value!=='string')throw Error('OIDC response invalid');return data.value;
 }
 async function gateway(path,body,identity){
- const r=await fetch(GATEWAY+path,{method:'POST',headers:{Authorization:'Bearer '+identity,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(55000)});
+ const r=await fetch(GATEWAY+path,{method:'POST',headers:{Authorization:'Bearer '+identity,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(25000)});
  const json=await r.json().catch(()=>({error:'Invalid JSON'}));
  if(!r.ok)throw Error('Gateway '+path+' HTTP '+r.status+': '+String(json.error||'error'));
  return json;
@@ -100,7 +130,11 @@ async function main(){
  const sectionStart=original.indexOf(ALLOWED_REGION_START);
  const sectionEnd=original.indexOf(ALLOWED_REGION_END,sectionStart);
  if(sectionStart<0||sectionEnd<0)throw Error('No permitted ASR area');
- const context=original.slice(Math.max(0,sectionStart-300),Math.min(original.length,sectionEnd+200));
+ const context=original.slice(sectionStart,sectionEnd);
+ // A concrete new ASR edge case: the accent 'é' is often transcribed instead of 'è'.
+ // This is a test objective, not an AI instruction to change unrelated source.
+ const targetUtterance='Hey Jarvis micr é un sito web per un idraulico';
+
  let feedback='',proposed=null,attempts=0,result='';
  try{
   for(let i=0;i<2;i++){
@@ -111,6 +145,7 @@ async function main(){
     const outcome=safePatch(original,patch);
     if(!outcome.changed){result=outcome.reason;break}
     validateParserWithNode(outcome.source);
+    const behavior=verifyBehaviorChange(original,outcome.source);
     writeFileSync(TARGET,outcome.source);
     // Contracts + Android simulation run without Cloudflare secrets, DB or network permissions.
     run('node',['tests/qa-guardian-contract.mjs']);
@@ -120,7 +155,7 @@ async function main(){
     proposed={...outcome,attempts};break;
    }catch(e){feedback=String(e?.stderr||e?.message||e).slice(-700);writeFileSync(TARGET,original)}
   }
-  if(!proposed){await gateway('/complete',{job_id:id,status:'no_change',result:'No safe verified patch. '+feedback.slice(0,100)},identity);report({status:'no_change',reason:result||feedback,attempts});return}
+  if(!proposed){await gateway('/complete',{job_id:id,status:'no_change',result:'No safe verified patch. '+(feedback||result).slice(0,160)},identity);report({status:'no_change',reason:feedback||result,attempts});return}
   // No deployment; only a branch + PR. GitHub Actions GITHUB_TOKEN cannot trigger a second privileged workflow.
   const branch='jarvis/autoimprove-'+String(process.env.GITHUB_RUN_ID||'').replace(/\D/g,'').slice(0,15);
   run('git',['config','user.name','jarvis-autoimprove[bot]']);
