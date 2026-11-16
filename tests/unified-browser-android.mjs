@@ -494,7 +494,7 @@ try{
  assert.equal(tasks.length,improvementTasks,'AutoImprove may not change tasks');
  await page.locator('#chatInput').fill('Hey Jarvis, migliorati automaticamente');
  await page.locator('#chatForm button[type=submit]').click();
- await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('richiesta di automiglioramento è già presente'),{timeout:15000});
+ await page.waitForFunction(()=>[...document.querySelectorAll('#conversation .bubble.jarvis')].at(-1)?.textContent?.includes('La richiesta risulta in coda'),{timeout:15000});
  assert.equal(memories.filter(x=>x.category==='JARVIS_AUTOIMPROVE_TASK').length,improvementBefore+1,'Repeat command may not duplicate queued requests');
  // Regression: real Redmi ASR utterance previously got a fabricated advisory AI response.
  const aiBeforeRedmi=writes.filter(w=>w.path==='/api/ai-chat').length;
