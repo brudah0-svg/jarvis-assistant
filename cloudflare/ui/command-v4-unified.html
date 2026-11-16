@@ -485,6 +485,12 @@ function parseJarvisCoreCommand(message){
  // Android recognition sometimes inserts «è» between the wake name and the command.
  // Normalize only for the autoimprovement intent, leaving other actions unchanged.
  const autoIntent=input.replace(/^(?:è|e)\s+(?=(?:miglior|auto[- ]?miglior))/i,'');
+ // Status and retry have distinct semantics: read-only query vs explicit bounded queue write.
+ if(/^(?:(?:mostra(?:mi)?|controlla|dimmi|verifica)\\s+)?(?:lo\\s+)?stato\\s+(?:del\\s+)?(?:tuo\\s+)?(?:auto[- ]?)?miglioramento[.!?]*$/i.test(input)
+    ||/^(?:come\\s+sta\\s+andando|a\\s+che\\s+punto\\s+(?:è|e|sei))\\s+(?:il\\s+tuo\\s+)?(?:auto[- ]?)?miglioramento[.!?]*$/i.test(input))
+  return {kind:'autoimprove-status'};
+ if(/^(?:(?:riprova|ritenta|ripeti)\\s+(?:a\\s+)?(?:migliorarti|auto[- ]?migliorarti|il\\s+tuo\\s+(?:auto[- ]?)?miglioramento)|(?:riprendi|riavvia)\\s+(?:l['’])?(?:auto[- ]?)?miglioramento)[.!?]*$/i.test(input))
+  return {kind:'autoimprove-retry'};
  // Explicit improvement request: queue a bounded proposal task. Do NOT perform code writes here.
  if(/^(?:(?:avvia|inizia|attiva)\s+(?:(?:il|l['’])\s*)?(?:processo\s+di\s+)?(?:auto[- ]?)?miglioramento|(?:auto[- ]?)?migliorati|migliora(?:ti)?(?:\s+(?:autonomamente|automaticamente|da\s+solo|il\s+tuo\s+codice|te\s+stesso))|(?:inizia|comincia)\s+a\s+(?:auto[- ]?)?migliorarti)(?:\s+(?:da\s+solo|autonomamente|automaticamente))?[.!?]*$/i.test(autoIntent))
   return {kind:'autoimprove'};
@@ -594,11 +600,41 @@ function showMultipageProjectInChat(project){
 }
 async function runJarvisCoreCommand(command){
  if(command.kind==='voice-cancel')return 'Ricevuto, signore. Operazione annullata: nessuna modifica al Cloud.';
+ if(command.kind==='autoimprove-status'){
+  const result=await api('/api/autoimprove/status');
+  if(result?.status!=='ok'||!Array.isArray(result.history))throw Error('Registro automiglioramento non verificabile.');
+  const latest=result.latest;
+  if(!latest)return result.requests_recorded>0?'Ho trovato una richiesta registrata nel Cloud, ma nessun tentativo dell’agente è ancora documentato. Nessuna modifica verificata.':'Nessuna richiesta o tentativo di automiglioramento trovato nel Cloud.';
+  const labels={queued:'in coda',claimed:'in corso',no_change:'concluso senza modifiche',failed:'non riuscito',proposed:'proposta GitHub preparata'};
+  const label=labels[latest.status]||'stato sconosciuto';
+  const reason=String(latest.result||'').slice(0,200);
+  return 'Stato verificato dell’automiglioramento: '+label+'. '+(reason?'Risultato: '+reason+'. ':'')+
+   (['no_change','failed'].includes(latest.status)?'Se vuoi un nuovo tentativo controllato, di’ «Jarvis, riprova a migliorarti».':
+    latest.status==='proposed'?'Controlla la proposta GitHub prima di approvare modifiche.':'Attendi la prossima esecuzione GitHub programmata.')+
+   ' Nessun aggiornamento del codice in produzione eseguito da questo comando.';
+ }
+ if(command.kind==='autoimprove-retry'){
+  const status=await api('/api/autoimprove/status');
+  if(status?.status!=='ok'||!status.latest?.id)throw Error('Ultimo tentativo non verificabile: nessun nuovo lavoro creato.');
+  if(!['no_change','failed'].includes(status.latest.status))return 'L’ultimo tentativo risulta '+String(status.latest.status)+'. Non è possibile accodare un nuovo retry.';
+  const queued=await post('/api/autoimprove/retry',{job_id:status.latest.id});
+  if(queued?.status!=='queued'||!queued.job?.id)throw Error('Il Cloud non ha confermato il nuovo tentativo.');
+  return 'Nuovo tentativo di automiglioramento accodato e confermato dal Cloud. Verrà elaborato al prossimo ciclo GitHub, con limiti di tentativi e test obbligatori. Nessuna modifica pubblicata.';
+ }
  if(command.kind==='autoimprove'){
   if(!state.availability.memories)throw Error('Coda Cloud non disponibile: non ho avviato nessun miglioramento.');
   const goal='Migliora in sicurezza il riconoscimento vocale dei comandi italiani di JARVIS. Non modificare autorizzazioni, approvazioni o pubblicazione.';
   const match=state.memories.find(m=>m.category==='JARVIS_AUTOIMPROVE_TASK'&&String(m.content||'').trim()===goal);
-  if(match)return 'Una richiesta di automiglioramento è già presente nella coda. QA Guardian e l’agente GitHub la elaboreranno al prossimo controllo programmato, se il collegamento AI è disponibile. Nessuna modifica in produzione.';
+  if(match){
+   const record=await api('/api/autoimprove/status');
+   if(record?.status!=='ok'||!Array.isArray(record.history))throw Error('Registro automiglioramento non disponibile: non dichiaro richieste in corso.');
+   const latest=record.latest;
+   if(latest&&['no_change','failed','proposed'].includes(latest.status))
+    return 'Questa richiesta è stata già elaborata: esito '+latest.status+'. '+String(latest.result||'').slice(0,190)+'. '+(['no_change','failed'].includes(latest.status)?'Per riprovare, di’ «Jarvis, riprova a migliorarti».':'Verifica la proposta GitHub prima di applicare modifiche.')+' Nessuna modifica in produzione.';
+   return latest?.status==='queued'||latest?.status==='claimed'
+    ?'La richiesta risulta '+(latest.status==='queued'?'in coda':'in lavorazione')+' nel registro AutoImprove. Nessuna modifica in produzione.'
+    :'Ho trovato la richiesta iniziale, ma non un tentativo recente verificabile. Chiedimi «Jarvis, stato automiglioramento».';
+  }
   const saved=await post('/api/memory',{content:goal,category:'JARVIS_AUTOIMPROVE_TASK'});
   if(saved.status!=='created'||!saved.memory?.id)throw Error('Coda non confermata dal Cloud.');
   await loadAll();
