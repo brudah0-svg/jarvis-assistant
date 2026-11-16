@@ -31,6 +31,8 @@ jobs:
         run: node tests/qa-guardian-contract.mjs
       - name: Validate autonomous improvement isolation and OIDC claims
         run: node tests/autoimprove-contract.mjs
+      - name: Validate isolated AutoImprove patch canary
+        run: node tests/autoimprove-patch-canary.mjs
       - name: Run full synthetic contract and safety suite
         run: node scripts/qa-guardian.mjs --suite=contracts
       - name: Preserve machine-readable quality report
