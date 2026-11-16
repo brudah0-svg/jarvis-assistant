@@ -3,7 +3,7 @@ import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const original=readFileSync('cloudflare/workers/jarvis-backend.mjs','utf8');
-assert.equal(hash(original),'15f9b6ca957c2999208efd65ce5918e9579bc7d6006faf2035410d796acfee17');
+assert.equal(hash(original),'921d28c66232e86e4a0e86cf105fed98fb656d7c2940a6853cdeb6a89c8ad9cc');
 const html=readFileSync('cloudflare/ui/command-v4-unified.html','utf8');
 const manifest=readFileSync('cloudflare/ui/jarvis-app.webmanifest','utf8');
 assert(html.includes('result.operations_executed===false'));
