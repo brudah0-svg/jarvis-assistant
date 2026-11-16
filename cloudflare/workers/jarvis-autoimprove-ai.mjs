@@ -21,7 +21,7 @@ export function trustClaims(claims,now=Math.floor(Date.now()/1000)){
   &&aud.includes(AUDIENCE)&&claims?.repository===REPO
   &&String(claims?.repository_id)===REPO_ID&&claims?.ref==='refs/heads/main'
   &&claims?.workflow_ref===WORKFLOW&&claims?.runner_environment==='github-hosted'
-  &&['schedule','workflow_dispatch'].includes(claims?.event_name)
+  &&['schedule','workflow_dispatch','push'].includes(claims?.event_name)
   &&/^[0-9]{5,20}$/.test(String(claims?.run_id||''))
   &&Number.isInteger(claims?.iat)&&Number.isInteger(claims?.exp)
   &&claims.iat<=now+60&&claims.exp>now&&claims.exp-now<=1800
