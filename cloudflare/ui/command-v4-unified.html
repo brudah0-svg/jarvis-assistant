@@ -468,7 +468,7 @@ let chatBusy=false;
 // Core command execution: explicit, user-initiated and reversible. Never invoke AI for a write.
 function parseJarvisCoreCommand(message){
  const input=String(message||'')
-  .replace(/^(?:(?:ciao|salve|buongiorno|buonasera|ehi|hey)\s+)?jarvis[\s,:;.!?-]*/i,'')
+  .replace(/^(?:e\s+)?(?:(?:ciao|salve|buongiorno|buonasera|ehi|hey)\s+)?jarvis[\s,:;.!?-]*/i,'')
   .replace(/^(?:ciao|salve|buongiorno|buonasera)[\s,:;.!?-]+(?:ehi|hey)?\s*jarvis[\s,:;.!?-]*/i,'')
   .trim();
  // Spoken confirmation is valid only for the exact project/task prepared in this session.
@@ -482,8 +482,11 @@ function parseJarvisCoreCommand(message){
     return {kind:'voice-cancel'};
   }
  }
+ // Android recognition sometimes inserts «è» between the wake name and the command.
+ // Normalize only for the autoimprovement intent, leaving other actions unchanged.
+ const autoIntent=input.replace(/^(?:è|e)\s+(?=(?:miglior|auto[- ]?miglior))/i,'');
  // Explicit improvement request: queue a bounded proposal task. Do NOT perform code writes here.
- if(/^(?:(?:avvia|inizia|attiva)\s+(?:(?:il|l['’])\s*)?(?:processo\s+di\s+)?(?:auto[- ]?)?miglioramento|(?:auto[- ]?)?migliorati|migliora(?:ti)?(?:\s+(?:autonomamente|automaticamente|da\s+solo|il\s+tuo\s+codice|te\s+stesso))|(?:inizia|comincia)\s+a\s+(?:auto[- ]?)?migliorarti)(?:\s+(?:da\s+solo|autonomamente|automaticamente))?[.!?]*$/i.test(input))
+ if(/^(?:(?:avvia|inizia|attiva)\s+(?:(?:il|l['’])\s*)?(?:processo\s+di\s+)?(?:auto[- ]?)?miglioramento|(?:auto[- ]?)?migliorati|migliora(?:ti)?(?:\s+(?:autonomamente|automaticamente|da\s+solo|il\s+tuo\s+codice|te\s+stesso))|(?:inizia|comincia)\s+a\s+(?:auto[- ]?)?migliorarti)(?:\s+(?:da\s+solo|autonomamente|automaticamente))?[.!?]*$/i.test(autoIntent))
   return {kind:'autoimprove'};
  // The user asks JARVIS to inspect itself; never interpret this as permission to deploy code.
  if(/^(?:(?:auto)?analizzati|analizza il tuo (?:codice|sistema)|controlla come migliorarti|migliorati|valuta come migliorarti)(?:\s+e\s+(?:proponi|prepara)(?:\s+(?:dei|i))?\s+miglioramenti|\s+e\s+proponi\s+come\s+migliorarti)?[.!?]*$/i.test(input))

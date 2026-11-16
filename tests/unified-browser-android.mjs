@@ -490,6 +490,21 @@ try{
  await page.waitForFunction(()=>[...document.querySelectorAll('#conversation .bubble.jarvis')].at(-1)?.textContent?.includes('già presente nella coda'),{timeout:15000});
  assert.equal(memories.filter(x=>x.category==='JARVIS_AUTOIMPROVE_TASK').length,improvementBefore+1,'Redmi command must route to existing queue');
  assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,aiBeforeRedmi,'No advisory AI answer for Redmi autoimprovement command');
+
+ // Exact ASR artifacts captured on the phone: filler before Jarvis or before the imperative.
+ for(const transcript of ['e Jarvis migliorati autonomamente','Jarvis è migliorati autonomamente','Jarvis e migliorati autonomamente']){
+  const previousBubbles=await page.locator('#conversation .bubble.jarvis').count();
+  const queuedBefore=memories.filter(x=>x.category==='JARVIS_AUTOIMPROVE_TASK').length;
+  const consultedBefore=writes.filter(w=>w.path==='/api/ai-chat').length;
+  await page.locator('#chatInput').fill(transcript);
+  await page.locator('#chatForm button[type=submit]').click();
+  await page.waitForFunction(previous=>document.querySelectorAll('#conversation .bubble.jarvis').length>previous,previousBubbles,{timeout:15000});
+  const lastJarvis=await page.locator('#conversation .bubble.jarvis').last().textContent();
+  assert.match(lastJarvis,/già presente nella coda/i,'ASR artifact must route to existing job: '+transcript);
+  assert.equal(memories.filter(x=>x.category==='JARVIS_AUTOIMPROVE_TASK').length,queuedBefore,'ASR artifact cannot duplicate job');
+  assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,consultedBefore,'ASR artifact cannot go to advisory AI');
+ }
+
  const beforeAnother=writes.filter(w=>w.path==='/api/ai-chat').length;
  await page.locator('#chatInput').fill('Jarvis, quanto tempo serve per migliorarti autonomamente?');
  await page.locator('#chatForm button[type=submit]').click();
