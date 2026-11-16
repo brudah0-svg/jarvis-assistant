@@ -483,6 +483,19 @@ try{
  await page.locator('#chatForm button[type=submit]').click();
  await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('richiesta di automiglioramento è già presente'),{timeout:15000});
  assert.equal(memories.filter(x=>x.category==='JARVIS_AUTOIMPROVE_TASK').length,improvementBefore+1,'Repeat command may not duplicate queued requests');
+ // Regression: real Redmi ASR utterance previously got a fabricated advisory AI response.
+ const aiBeforeRedmi=writes.filter(w=>w.path==='/api/ai-chat').length;
+ await page.locator('#chatInput').fill('Ehi Jarvis migliorati autonomamente');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>[...document.querySelectorAll('#conversation .bubble.jarvis')].at(-1)?.textContent?.includes('già presente nella coda'),{timeout:15000});
+ assert.equal(memories.filter(x=>x.category==='JARVIS_AUTOIMPROVE_TASK').length,improvementBefore+1,'Redmi command must route to existing queue');
+ assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,aiBeforeRedmi,'No advisory AI answer for Redmi autoimprovement command');
+ const beforeAnother=writes.filter(w=>w.path==='/api/ai-chat').length;
+ await page.locator('#chatInput').fill('Jarvis, quanto tempo serve per migliorarti autonomamente?');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(()=>[...document.querySelectorAll('#conversation .bubble.jarvis')].at(-1)?.textContent?.includes('Risposta sintetica'),{timeout:15000});
+ assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,beforeAnother+1,'Questions remain read-only AI');
+ assert.equal(memories.filter(x=>x.category==='JARVIS_AUTOIMPROVE_TASK').length,improvementBefore+1,'No new job from information question');
  assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0,'AutoImprove command may not deploy or invoke GitHub directly');
  assert.deepEqual(jsErrors,[],'No unhandled JS errors');
  assert.deepEqual(externalNetwork,[],'No external domains were contacted');

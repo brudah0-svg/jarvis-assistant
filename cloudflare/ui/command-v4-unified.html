@@ -483,7 +483,7 @@ function parseJarvisCoreCommand(message){
   }
  }
  // Explicit improvement request: queue a bounded proposal task. Do NOT perform code writes here.
- if(/^(?:avvia (?:l['’])?(?:auto)?miglioramento|migliora(?:ti)? (?:da solo|automaticamente|il tuo codice)|auto[- ]?migliorati|inizia ad auto[- ]?migliorarti)(?:[.!?]*)$/i.test(input))
+ if(/^(?:(?:avvia|inizia|attiva)\s+(?:(?:il|l['’])\s*)?(?:processo\s+di\s+)?(?:auto[- ]?)?miglioramento|(?:auto[- ]?)?migliorati|migliora(?:ti)?(?:\s+(?:autonomamente|automaticamente|da\s+solo|il\s+tuo\s+codice|te\s+stesso))|(?:inizia|comincia)\s+a\s+(?:auto[- ]?)?migliorarti)(?:\s+(?:da\s+solo|autonomamente|automaticamente))?[.!?]*$/i.test(input))
   return {kind:'autoimprove'};
  // The user asks JARVIS to inspect itself; never interpret this as permission to deploy code.
  if(/^(?:(?:auto)?analizzati|analizza il tuo (?:codice|sistema)|controlla come migliorarti|migliorati|valuta come migliorarti)(?:\s+e\s+(?:proponi|prepara)(?:\s+(?:dei|i))?\s+miglioramenti|\s+e\s+proponi\s+come\s+migliorarti)?[.!?]*$/i.test(input))
@@ -775,6 +775,15 @@ $('chatForm').onsubmit=async e=>{
     try{await post('/api/chat-history',{role:'assistant',content:reply})}
     catch(e){say('Comando gestito, ma il messaggio di conferma non è stato salvato nello storico: '+e.message,'system')}
     return;
+   }
+   // Fail closed for a missed autonomous-improvement instruction. Advisory AI is not
+   // authorized to describe ongoing self-rewrites. The user must see an honest status.
+   if(/\b(?:miglior(?:a|ati|arti)|automiglior(?:a|ati|arti)|auto[- ]?miglioramento)\b/i.test(message)
+      &&/\b(?:autonomamente|automaticamente|da\s+solo|auto[- ]?miglioramento|migliorati)\b/i.test(message)
+      &&/\b(?:jarvis|migliora|migliorati|migliorarti|automigliorati)\b/i.test(message)
+      &&!/[?？]/.test(message)){
+    const warning='Ho capito che vuoi attivare l’automiglioramento, ma non ho riconosciuto un comando operativo valido. Nessuna richiesta è stata accodata e nessuna modifica è stata eseguita. Ripeti: «Jarvis, migliorati autonomamente».';
+    say(warning);await post('/api/chat-history',{role:'assistant',content:warning});return;
    }
    const result=await post('/api/ai-chat',{message});
    const answer=result.answer||'Il modello non ha restituito una risposta.';
