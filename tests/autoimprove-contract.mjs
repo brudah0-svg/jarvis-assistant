@@ -22,7 +22,7 @@ assert.deepEqual(safePatch(original,{find,replace:find,reason:'nothing'}),{chang
 assert.throws(()=>safePatch(original,{find,replace:'fetch("https://evil")',reason:'malicious'}),/Forbidden/);
 assert.throws(()=>safePatch(original,{find:'fake-pattern',replace:'another',reason:'not found'}),/does not match/);
 assert.throws(()=>safePatch(original,{find:find.repeat(20),replace:valid,reason:'oversized'}),/Patch size/);
-assert.throws(()=>safePatch(original,{find,replace:'const noisyPrefix=input.match(',reason:'boundary shift'}),/ASR regex boundary changed|does not match|Only ASR/);
+assert.throws(()=>safePatch(original,{find:section.slice(0,48),replace:'  changed=input.match(/^(?:',reason:'boundary shift'}),/ASR regex boundary changed/);
 assert.throws(()=>safePatch(original,{find,replace:valid+'\nalert(1)',reason:'malicious newline'}),/Patch must not add lines/);
 assert.throws(()=>extractPatch('not JSON'),/Unexpected token|JSON/);
 assert.equal(extractPatch('```json\n{"find":"","replace":"","reason":"none"}\n```').reason,'none');
