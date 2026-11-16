@@ -101,9 +101,9 @@ async function generate(env,claims,request){
 }
 async function complete(env,claims,request){
  const b=await bodyJson(request),id=String(b.job_id||''),status=String(b.status||'');
- if(!/^[0-9a-f-]{36}$/i.test(id)||!['proposed','failed','no_change'].includes(status))return fail('Invalid outcome');
+ if(!/^[0-9a-f-]{36}$/i.test(id)||!['proposed','branch_ready','failed','no_change'].includes(status))return fail('Invalid outcome');
  const result=String(b.result||'').slice(0,350);
- if(result&&!(result.startsWith('https://github.com/'+REPO+'/pull/')||!result.startsWith('http')))return fail('Invalid result link');
+ if(result&&(!result.startsWith('https://github.com/'+REPO+'/pull/')&&!result.startsWith('https://github.com/'+REPO+'/compare/')))return fail('Invalid result link');
  const update=await env.DB.prepare("UPDATE jarvis_agent_improve_jobs SET status=?,finished_at=CURRENT_TIMESTAMP,result=? WHERE id=? AND run_id=? AND status='claimed'").bind(status,result,id,String(claims.run_id)).run();
  if(update.meta?.changes!==1)return fail('Job not found or already completed',409);
  return out({status:'recorded',production_modified:false});
