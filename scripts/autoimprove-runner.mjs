@@ -91,6 +91,12 @@ export function verifyBehaviorChange(before,after){
  if(now?.kind!=='website'||!String(now.title).includes('idraulico'))throw Error('Patch does not improve the target ASR edge case');
  return {regressions_checked:baseline.length,new_case:edge};
 }
+export function validatedDraftPR(details,branch){
+ if(!details||typeof details!=='object'||typeof branch!=='string')return null;
+ const m=/^https:\/\/github\.com\/brudah0-svg\/jarvis-assistant\/pull\/[1-9][0-9]*$/.exec(String(details.url||''));
+ if(!m||details.isDraft!==true||details.state!=='OPEN'||details.headRefName!==branch||details.baseRefName!=='main')return null;
+ return m[0];
+}
 export function validateParserWithNode(html){
  const open=html.indexOf('<script>"use strict";');
  const close=html.indexOf('</script>',open);
@@ -173,15 +179,26 @@ async function main(){
   run('git',['add','--',TARGET]);
   run('git',['commit','-m','fix(voice): guarded Italian ASR improvement ('+id.slice(0,8)+')']);
   run('git',['push','origin','HEAD:refs/heads/'+branch]);
+  const localHead=run('git',['rev-parse','HEAD']).trim();
+  const publishedHead=run('git',['ls-remote','--exit-code','origin','refs/heads/'+branch]).trim().split(/\s+/)[0];
+  if(localHead!==publishedHead)throw Error('Pushed review branch could not be verified');
   const message='JARVIS AutoImprove proposal (verified by QA Guardian).\n\nGoal: '+goal+'\n\nAI rationale: '+proposed.reason+'\n\nTests: npm test, QA Guardian contract, synthetic Android Chromium.\n\nRisk: generated change requires human review. **No automatic merge or production deployment.**\n\nJob: '+id;
-  let pr='https://github.com/brudah0-svg/jarvis-assistant/compare/main...'+branch+'?expand=1';
+  const compare='https://github.com/brudah0-svg/jarvis-assistant/compare/main...'+branch+'?expand=1';
+  let verifiedPR=null;
   try{
-   const r=run('gh',['pr','create','--draft','--base','main','--head',branch,'--title','JARVIS AutoImprove: guarded voice parser patch','--body',message]);
-   const parsed=r.match(/https:\/\/github\.com\/brudah0-svg\/jarvis-assistant\/pull\/\d+/);
-   if(parsed)pr=parsed[0];
-  }catch(e){console.warn('PR creation unavailable; branch and comparison link retained')}
-  await gateway('/complete',{job_id:id,status:'proposed',result:pr},identity);
-  report({status:'proposed',reason:proposed.reason,attempts,pull_request:pr,branch});
+   const created=run('gh',['pr','create','--draft','--base','main','--head',branch,'--title','JARVIS AutoImprove: guarded voice parser patch','--body',message]);
+   const candidate=created.match(/https:\/\/github\.com\/brudah0-svg\/jarvis-assistant\/pull\/[1-9][0-9]*/)?.[0];
+   if(!candidate)throw Error('GitHub did not return a PR URL');
+   const evidence=JSON.parse(run('gh',['pr','view',candidate,'--json','url,isDraft,state,headRefName,baseRefName']));
+   verifiedPR=validatedDraftPR(evidence,branch);
+   if(!verifiedPR)throw Error('Draft PR could not be verified');
+  }catch(e){
+   console.warn('Draft PR not verified; only review branch is confirmed: '+String(e.message||e).slice(0,150));
+  }
+  const status=verifiedPR?'proposed':'branch_ready';
+  const reviewUrl=verifiedPR||compare;
+  await gateway('/complete',{job_id:id,status,result:reviewUrl},identity);
+  report({status,reason:proposed.reason,attempts,pull_request:verifiedPR||undefined,branch,review_url:reviewUrl});
  }catch(error){
   try{await gateway('/complete',{job_id:id,status:'failed',result:String(error?.message||error).slice(0,250)},identity)}catch{}
   report({status:'failed',reason:String(error?.message||error).slice(0,250),attempts});
