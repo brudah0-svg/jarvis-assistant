@@ -18,7 +18,16 @@ export function extractPatch(raw){
  let text=String(raw||'').trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,'');
  if(text.length>5000)throw Error('Proposal too long');
  const p=JSON.parse(text);
- if(!p||typeof p.find!=='string'||typeof p.replace!=='string'||typeof p.reason!=='string')throw Error('Invalid proposal fields');
+ if(!p||typeof p!=='object'||Array.isArray(p)||typeof p.reason!=='string')throw Error('Invalid proposal fields');
+ // LLM chooses a catalogued, code-reviewed operation. The model does not get
+ // permission to synthesize executable code. Unknown identifiers fail closed.
+ if(typeof p.operation_id==='string'){
+  if(p.operation_id!=='asr-acute-accent-v1')throw Error('Unknown improvement operation');
+  const find=String.raw`mi\s*cr[eè]?\s*(?:è|e)?\s*`;
+  const replace=String.raw`mi\s*cr[eè]?\s*(?:è|e|é)?\s*`;
+  return {find,replace,reason:p.reason.slice(0,220),catalogue_id:p.operation_id};
+ }
+ if(typeof p.find!=='string'||typeof p.replace!=='string')throw Error('Invalid proposal fields');
  return p;
 }
 export function safePatch(original,p){
