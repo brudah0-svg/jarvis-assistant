@@ -8,7 +8,7 @@ on:
         required: false
         type: string
   schedule:
-    - cron: '43 4 * * *'
+    - cron: '43 4,12,20 * * *'
 
 permissions:
   contents: write
@@ -36,8 +36,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate agent safety contract before any AI request
-        run: node tests/autoimprove-contract.mjs
+      - name: Validate agent safety contracts and offline patch canary
+        run: |
+          node tests/autoimprove-contract.mjs
+          node tests/autoimprove-patch-canary.mjs
       - name: Install synthetic Android browser
         run: |
           npm install --no-save --no-audit --no-fund playwright@1.56.1
