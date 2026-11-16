@@ -23,7 +23,9 @@ export function extractPatch(raw){
 export function safePatch(original,p){
  assert.equal(typeof original,'string');
  if(!p.find||!p.replace)return {changed:false,reason:'AI found no safe change'};
- if(p.find.length<30||p.find.length>800||p.replace.length<30||p.replace.length>1000)throw Error('Patch size outside limits');
+ // Prefer atomic replacements. A 277-character ASR expression should not be
+ // recopied by a small LLM: copying the whole expression caused the verified no_change.
+ if(p.find.length<6||p.find.length>120||p.replace.length<2||p.replace.length>160)throw Error('Patch size outside atomic limits');
  if(p.find===p.replace)return {changed:false,reason:'No change'};
  if(forbidden.test(p.find)||forbidden.test(p.replace))throw Error('Forbidden operation in patch');
  if(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(p.find+p.replace))throw Error('Control characters rejected');
@@ -36,13 +38,18 @@ export function safePatch(original,p){
  const slice=original.slice(start,end);
  if(!slice.includes(p.find)||slice.split(p.find).length!==2)throw Error('Patch does not match exactly once within permitted ASR region');
  if(original.split(p.find).length!==2)throw Error('Patch not unique across source');
- if(!p.replace.includes('const noisyPrefix=input.match(')||!p.replace.includes('/i);'))throw Error('Only ASR noisyPrefix pattern can be amended');
- if(!p.find.includes('const noisyPrefix=input.match(')||!p.find.includes('/i);'))throw Error('Entire ASR expression must be matched');
- if(p.replace.includes('\n')&&p.replace.split('\n').length>4)throw Error('Multiline code addition forbidden');
- const updated=original.slice(0,start)+slice.replace(p.find,p.replace)+original.slice(end);
+ // The only mutable bytes are a contiguous substring *inside* the existing ASR regex.
+ // Keep the complete parser expression, statement boundaries, and all adjacent logic.
+ if(/[\r\n]/.test(p.find+p.replace))throw Error('Patch must not add lines');
+ const patchedSlice=slice.replace(p.find,p.replace);
+ const prefix=' const noisyPrefix=input.match(';const suffix='/i);\n';
+ if(!patchedSlice.startsWith(prefix)||!patchedSlice.endsWith(suffix)||patchedSlice.split(prefix).length!==2||patchedSlice.split(suffix).length!==2)
+  throw Error('ASR regex boundary changed');
+ if(patchedSlice.length>slice.length+80||patchedSlice.length<slice.length-80)throw Error('ASR change exceeds local budget');
+ const updated=original.slice(0,start)+patchedSlice+original.slice(end);
  if(updated===original)return {changed:false,reason:'No effective change'};
  const diffLen=Math.abs(updated.length-original.length);
- if(diffLen>280)throw Error('Too large ASR change');
+ if(diffLen>80)throw Error('Too large ASR change');
  return {changed:true,source:updated,reason:p.reason.slice(0,250),original_sha256:hash(original),updated_sha256:hash(updated)};
 }
 export function validateParserWithNode(html){
