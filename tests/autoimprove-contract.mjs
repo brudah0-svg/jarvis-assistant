@@ -28,6 +28,8 @@ assert.throws(()=>extractPatch('not JSON'),/Unexpected token|JSON/);
 assert.equal(extractPatch('```json\n{"find":"","replace":"","reason":"none"}\n```').reason,'none');
 const claims={iss:'https://token.actions.githubusercontent.com',aud:'jarvis-autoimprove-v1',repository:'brudah0-svg/jarvis-assistant',repository_id:'1434871186',workflow_ref:'brudah0-svg/jarvis-assistant/.github/workflows/autoimprove.yml@refs/heads/main',runner_environment:'github-hosted',ref:'refs/heads/main',event_name:'workflow_dispatch',run_id:'1234567',iat:1770000000,exp:1770000600};
 assert.equal(trustClaims(claims,1770000100),true);
+assert.equal(trustClaims({...claims,event_name:'push'},1770000100),true,'Only signed main-branch push may start the on-merge live cycle');
+assert.equal(trustClaims({...claims,event_name:'pull_request'},1770000100),false,'Untrusted PR build cannot request AI writes');
 for(const [key,bad] of [['repository','attacker/fork'],['repository_id','1'],['workflow_ref','evil'],['runner_environment','self-hosted'],['ref','refs/heads/feature'],['event_name','pull_request'],['aud','other']]){
  assert.equal(trustClaims({...claims,[key]:bad},1770000100),false,key+' should fail closed');
 }

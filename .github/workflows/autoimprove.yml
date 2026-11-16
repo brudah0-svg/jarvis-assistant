@@ -1,6 +1,10 @@
 name: JARVIS AutoImprove — isolated AI patches
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/autoimprove.yml'
   workflow_dispatch:
     inputs:
       goal:
