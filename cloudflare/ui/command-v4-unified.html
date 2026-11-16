@@ -486,10 +486,10 @@ function parseJarvisCoreCommand(message){
  // Normalize only for the autoimprovement intent, leaving other actions unchanged.
  const autoIntent=input.replace(/^(?:è|e)\s+(?=(?:miglior|auto[- ]?miglior))/i,'');
  // Status and retry have distinct semantics: read-only query vs explicit bounded queue write.
- if(/^(?:(?:mostra(?:mi)?|controlla|dimmi|verifica)\\s+)?(?:lo\\s+)?stato\\s+(?:del\\s+)?(?:tuo\\s+)?(?:auto[- ]?)?miglioramento[.!?]*$/i.test(input)
-    ||/^(?:come\\s+sta\\s+andando|a\\s+che\\s+punto\\s+(?:è|e|sei))\\s+(?:il\\s+tuo\\s+)?(?:auto[- ]?)?miglioramento[.!?]*$/i.test(input))
+ if(/^(?:(?:mostra(?:mi)?|controlla|dimmi|verifica)\s+)?(?:lo\s+)?stato\s+(?:del\s+)?(?:tuo\s+)?(?:auto[- ]?)?miglioramento[.!?]*$/i.test(input)
+    ||/^(?:come\s+sta\s+andando|a\s+che\s+punto\s+(?:è|e|sei))\s+(?:il\s+tuo\s+)?(?:auto[- ]?)?miglioramento[.!?]*$/i.test(input))
   return {kind:'autoimprove-status'};
- if(/^(?:(?:riprova|ritenta|ripeti)\\s+(?:a\\s+)?(?:migliorarti|auto[- ]?migliorarti|il\\s+tuo\\s+(?:auto[- ]?)?miglioramento)|(?:riprendi|riavvia)\\s+(?:l['’])?(?:auto[- ]?)?miglioramento)[.!?]*$/i.test(input))
+ if(/^(?:(?:riprova|ritenta|ripeti)\s+(?:a\s+)?(?:migliorarti|auto[- ]?migliorarti|il\s+tuo\s+(?:auto[- ]?)?miglioramento)|(?:riprendi|riavvia)\s+(?:l['’])?(?:auto[- ]?)?miglioramento)[.!?]*$/i.test(input))
   return {kind:'autoimprove-retry'};
  // Explicit improvement request: queue a bounded proposal task. Do NOT perform code writes here.
  if(/^(?:(?:avvia|inizia|attiva)\s+(?:(?:il|l['’])\s*)?(?:processo\s+di\s+)?(?:auto[- ]?)?miglioramento|(?:auto[- ]?)?migliorati|migliora(?:ti)?(?:\s+(?:autonomamente|automaticamente|da\s+solo|il\s+tuo\s+codice|te\s+stesso))|(?:inizia|comincia)\s+a\s+(?:auto[- ]?)?migliorarti)(?:\s+(?:da\s+solo|autonomamente|automaticamente))?[.!?]*$/i.test(autoIntent))
