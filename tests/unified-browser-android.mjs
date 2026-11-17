@@ -56,7 +56,7 @@ const server=createServer(async(req,res)=>{
    if(path==='/api/tasks')return json(res,200,{tasks});
    if(path==='/api/memory')return json(res,200,{memories});
    if(path==='/api/proposals')return json(res,200,{proposals});
-   if(path==='/api/autonomy/status')return json(res,200,{status:'healthy',latest:{checks_passed:5,checks_total:5},pending_approvals:[],automatic_publication:false});
+   if(path==='/api/autonomy/status')return json(res,200,{status:'attention',latest:{checks_passed:7,checks_total:9,created_at:'2026-11-17 06:00:14',findings:[{key:'scheduled_backup_evidence',status:'attention',detail:'Latest backup scheduled result failed'},{key:'independent_backup',status:'attention',detail:'Off-account independent export not_verified'}]},pending_approvals:[],automatic_publication:false});
     if(path==='/api/autonomy/remediations')return json(res,200,{status:'ok',cases:[{state:'needs_review',title:'Synthetic QA finding'}],automatic_execution:false});
     if(path==='/api/autoimprove/status')return json(res,200,{status:'ok',latest:improveJobs.at(-1)||null,history:[...improveJobs].reverse(),requests_recorded:memories.filter(m=>m.category==='JARVIS_AUTOIMPROVE_TASK').length,production_modified:false,automatic_deploy:false});
    if(path==='/api/chat-history')return json(res,200,{messages:[]});
@@ -89,7 +89,7 @@ const server=createServer(async(req,res)=>{
   }
   if(path==='/api/site-jobs'&&req.method==='POST'){
     const id='00000000-0000-4000-8000-'+String(++counter).padStart(12,'0');
-    const job={id,brief:body.brief,style:body.style,contact_email:body.contactEmail||'',status:'queued',attempt_count:0,draft_id:null,created_at:'2026-11-15 16:40:00'};
+    const job={id,brief:body.brief,style:body.style,contact_email:body.contactEmail||'',status:'queued',attempt_count:0,draft_id:null,created_at:'2026-11-15 16:40:00',updated_at:'2026-11-15 16:40:00'};
     siteJobs.push(job);return json(res,201,{status:'queued',job,external_publication:false});
   }
   if(path.startsWith('/api/site-jobs/')&&path.endsWith('/run')&&req.method==='POST'){
@@ -466,6 +466,38 @@ try{
  await page.locator('#chatForm button[type=submit]').click();
  await page.waitForFunction(()=>document.querySelector('#conversation .bubble.jarvis:last-of-type')?.textContent?.includes('Risposta sintetica')||[...document.querySelectorAll('#conversation .bubble.jarvis')].at(-1)?.textContent?.includes('Risposta sintetica'),{timeout:15000});
  assert.equal(siteJobs.length,afterNoisyJobs,'Question about site costs is not an action request');
+ // Regression: an hours-old "running" job must be recoverable from existing D1 job,
+ // not duplicated or falsely labelled as still executing. Backend lease is five minutes.
+ const stuckId='00000000-0000-4000-8000-000000009901';
+ const stuck={id:stuckId,brief:'Crea un sito web professionale per un\'officina meccanica',style:'notte',
+  status:'running',attempt_count:1,draft_id:null,created_at:'2026-11-15 13:07:33',updated_at:'2026-11-15 13:07:33'};
+ siteJobs.unshift(stuck);
+ const initialSiteJobCount=siteJobs.length;
+ await page.evaluate(async()=>{await loadSiteJobs()});
+ const recoveryButton=page.locator('#siteJobsList button[data-job-id="'+stuckId+'"]');
+ assert.equal(await recoveryButton.textContent(),'Recupera','Stale job should expose recovery, not disabled execution');
+ assert.equal(await recoveryButton.isEnabled(),true);
+ const chatAiBeforeHealth=writes.filter(w=>w.path==='/api/ai-chat').length;
+ const healthBefore=await page.locator('#conversation .bubble.jarvis').count();
+ await page.locator('#chatInput').fill('Jarvis, autocontrollati');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(n=>document.querySelectorAll('#conversation .bubble.jarvis').length>n,healthBefore,{timeout:15000});
+ const report=await page.locator('#conversation .bubble.jarvis').last().textContent();
+ assert.match(report,/7 verifiche superate su 9/);
+ assert.match(report,/Latest backup scheduled result failed/);
+ assert.match(report,/Off-account independent export not_verified/);
+ assert.match(report,/non ha eseguito nuovi test/i);
+ assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,chatAiBeforeHealth,'Autocontrollati must never fall back to advisory AI');
+ assert.equal(siteJobs.length,initialSiteJobCount,'Read-only health must not affect jobs');
+ const recoveryBefore=await page.locator('#conversation .bubble.jarvis').count();
+ await page.locator('#chatInput').fill('Jarvis, recupera il sito dell\'officina');
+ await page.locator('#chatForm button[type=submit]').click();
+ await page.waitForFunction(n=>document.querySelectorAll('#conversation .bubble.jarvis').length>n,recoveryBefore,{timeout:15000});
+ assert.match(await page.locator('#conversation .bubble.jarvis').last().textContent(),/Sito recuperato e completato/);
+ assert.equal(stuck.status,'completed','Existing stale job must complete');
+ assert.equal(stuck.attempt_count,2,'Stale job must use one bounded retry');
+ assert.equal(siteJobs.length,initialSiteJobCount,'Recovery must not create duplicate job');
+ assert.equal(writes.filter(w=>/publish|deploy|github/i.test(w.path)).length,0,'No external publication during recovery');
  // The conversational Core AI self-audit must use verified diagnostic APIs, not advisory AI.
  // It must prepare proposals without changing any user project/task records or deploying code.
  projects.push({id:'jarvis-core',name:'JARVIS',description:'Synthetic core project',status:'active'});
