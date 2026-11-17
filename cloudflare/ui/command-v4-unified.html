@@ -510,7 +510,7 @@ function parseJarvisCoreCommand(message){
  // Android speech recognition may fragment "mi crei un sito" as "micr è un sito un sito".
  // This fallback is intentionally constrained: an imperative-like start, a website noun,
  // and an explicit "per <recipient>" are ALL required. Informational questions stay read-only.
- const noisyPrefix=input.match(/^(?:(?:per favore|perfavore)\s+)?(?:(?:puoi|potresti)\s+)?(?:mi\s*cre(?:i|a|eresti|i\s+)|mi\s*cr[eè]?\s*(?:è|e)?\s*|micr\s*(?:è|e)?\s*|crea(?:mi)?|costruisci(?:mi)?|fammi|fai|realizza|sviluppa|preparami|vorrei\s+(?:un|il)\s+sito)\b[\s,:;-]*/i);
+ const noisyPrefix=input.match(/^(?:(?:per favore|perfavore)\s+)?(?:(?:puoi|potresti)\s+)?(?:mi\s*cre(?:i|a|eresti|i\s+)|mi\s*cr[eè]?\s*(?:è|e|é)?\s*|micr\s*(?:è|e)?\s*|crea(?:mi)?|costruisci(?:mi)?|fammi|fai|realizza|sviluppa|preparami|vorrei\s+(?:un|il)\s+sito)\b[\s,:;-]*/i);
  if(noisyPrefix){
   const rest=input.slice(noisyPrefix[0].length).trim();
   const site=rest.match(/^(?:(?:un|il)\s+)?(?:sito(?:\s+web)?|sito\s+(?:un\s+)?sito(?:\s+web)?|pagina\s+web|landing\s+page)(?:\s+(?:un\s+)?sito(?:\s+web)?)?\s+(?:per|di)\s+(.+)$/i);

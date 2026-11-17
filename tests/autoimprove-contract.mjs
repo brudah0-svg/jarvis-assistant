@@ -3,7 +3,17 @@ import {safePatch,extractPatch,hash,validateParserWithNode,verifyBehaviorChange,
 import {trustClaims} from '../cloudflare/workers/jarvis-autoimprove-ai.mjs';
 import {readFileSync} from 'node:fs';
 
-const original=readFileSync(TARGET,'utf8');
+const current=readFileSync(TARGET,'utf8');
+// The same guard must validate both the baseline and the approved AI patch.
+// Reconstruct the original in-memory for repeatable differential checks; never write files.
+const oldASR=String.raw`mi\s*cr[eè]?\s*(?:è|e)?\s*`;
+const improvedASR=String.raw`mi\s*cr[eè]?\s*(?:è|e|é)?\s*`;
+const patched=current.includes(improvedASR);
+assert.equal(current.includes(oldASR),!patched,'Exactly one supported ASR version must be present');
+const original=patched?current.replace(improvedASR,oldASR):current;
+assert.equal(validateParserWithNode(current),true,'Actual checked-out source must be valid JavaScript');
+if(patched)assert.equal(verifyBehaviorChange(original,current).regressions_checked,10,'Committed AI fix must improve the target utterance');
+
 const anchor=' const noisyPrefix=input.match(';
 const start=original.indexOf(anchor),end=original.indexOf(' if(noisyPrefix){',start);
 assert(start>0&&end>start,'Allowed region in real UI');
