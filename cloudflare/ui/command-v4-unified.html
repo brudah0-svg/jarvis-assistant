@@ -485,6 +485,12 @@ function parseJarvisCoreCommand(message){
  // Android recognition sometimes inserts «è» between the wake name and the command.
  // Normalize only for the autoimprovement intent, leaving other actions unchanged.
  const autoIntent=input.replace(/^(?:è|e)\s+(?=(?:miglior|auto[- ]?miglior))/i,'');
+ // Explicit read-only self-check: never fall back to advisory AI for this instruction.
+ if(/^(?:(?:auto[- ]?)?controllati|fai (?:un |l['’])?autocontrollo|verifica (?:il )?tuo stato|esegui (?:la )?diagnostica|controlla (?:il )?tuo sistema)[.!?]*$/i.test(input))
+  return {kind:'health-status'};
+ // Recover the most recent interrupted website job only when explicitly requested.
+ if(/^(?:(?:riprendi|recupera|riavvia|ritenta)\s+(?:(?:il|l['’])\s*)?(?:sito|lavoro|incarico)(?:\s+(?:bloccato|interrotto|dell['’]officina|per l['’]officina))?|(?:sblocca|riprendi)\s+(?:l['’])?ultimo\s+(?:sito|lavoro)(?:\s+bloccato)?)[.!?]*$/i.test(input))
+  return {kind:'site-resume'};
  // Status and retry have distinct semantics: read-only query vs explicit bounded queue write.
  if(/^(?:(?:mostra(?:mi)?|controlla|dimmi|verifica)\s+)?(?:lo\s+)?stato\s+(?:del\s+)?(?:tuo\s+)?(?:auto[- ]?)?miglioramento[.!?]*$/i.test(input)
     ||/^(?:come\s+sta\s+andando|a\s+che\s+punto\s+(?:è|e|sei))\s+(?:il\s+tuo\s+)?(?:auto[- ]?)?miglioramento[.!?]*$/i.test(input))
@@ -600,6 +606,33 @@ function showMultipageProjectInChat(project){
 }
 async function runJarvisCoreCommand(command){
  if(command.kind==='voice-cancel')return 'Ricevuto, signore. Operazione annullata: nessuna modifica al Cloud.';
+ if(command.kind==='health-status'){
+  const health=await api('/api/autonomy/status');
+  if(!health||!['healthy','attention','blocked','not_run'].includes(health.status)||
+     !Array.isArray(health.pending_approvals))throw Error('Diagnostica Cloud non verificabile.');
+  if(!health.latest)return 'La diagnostica programmata non ha ancora risultati verificati. Nessun autocontrollo eseguito adesso.';
+  if(!Array.isArray(health.latest.findings)||!Number.isInteger(health.latest.checks_total)||
+     !Number.isInteger(health.latest.checks_passed))throw Error('Rapporto di autocontrollo incompleto.');
+  const findings=health.latest.findings.filter(x=>x&&x.status!=='passed').slice(0,5);
+  const warnings=findings.map(x=>String(x.detail||x.key||'Anomalia non specificata').slice(0,170));
+  return 'Autocontrollo verificato nel Cloud, ultimo ciclo '+String(health.latest.created_at||'data non disponibile')+
+   ': '+health.latest.checks_passed+' verifiche superate su '+health.latest.checks_total+
+   '. Stato '+health.status+'. '+(warnings.length?'Problemi da verificare: '+warnings.join('; ')+'. ':'Nessuna anomalia segnalata. ')+
+   'Questo comando legge il rapporto esistente: non ha eseguito nuovi test, non ha accodato lavori e non ha modificato codice.';
+ }
+ if(command.kind==='site-resume'){
+  const current=await api('/api/site-jobs');
+  if(current?.status!=='ok'||!Array.isArray(current.jobs))throw Error('Registro lavori non verificabile: nessun sito riavviato.');
+  const job=current.jobs.find(x=>x&&typeof x.id==='string'&&/^[0-9a-f-]{36}$/i.test(x.id)&&
+    (x.status==='failed'||x.status==='queued'||isStaleSiteJob(x))&&Number(x.attempt_count)<3);
+  if(!job)return 'Non trovo un sito interrotto recuperabile. Non ho avviato nuove generazioni.';
+  const result=await post('/api/site-jobs/'+encodeURIComponent(job.id)+'/run',{});
+  if(result?.status!=='completed'||result.job?.id!==job.id)
+    throw Error('Il Cloud non conferma il completamento. Verifica la sezione Lavori prima di riprovare.');
+  await openSiteJob(result.job,false);
+  await loadSiteJobs();
+  return 'Sito recuperato e completato nel Cloud. Anteprima privata disponibile; nessuna pubblicazione esterna.';
+ }
  if(command.kind==='autoimprove-status'){
   const result=await api('/api/autoimprove/status');
   if(result?.status!=='ok'||!Array.isArray(result.history))throw Error('Registro automiglioramento non verificabile.');
@@ -712,7 +745,7 @@ async function runJarvisCoreCommand(command){
   if(command.kind==='site-status'){
    if(!jobs.length)return 'Non ci sono incarichi salvati nel tuo Cloud JARVIS.';
    const labels={queued:'in attesa',running:'in lavorazione',completed:'completato',failed:'non riuscito'};
-   const summary=jobs.slice(0,10).map((job,i)=>(i+1)+'. '+String(job.brief||'Sito senza descrizione').slice(0,80)+' — '+(labels[job.status]||'stato sconosciuto')).join('\n');
+   const summary=jobs.slice(0,10).map((job,i)=>(i+1)+'. '+String(job.brief||'Sito senza descrizione').slice(0,80)+' — '+(isStaleSiteJob(job)?'interrotto: recuperabile con conferma':labels[job.status]||'stato sconosciuto')).join('\n');
    return 'Ho trovato '+jobs.length+' incarichi nel Cloud (ultimi '+Math.min(jobs.length,10)+'):\n'+summary+'\nPer riaprire quello completato più recente, di’ «Apri l’ultimo sito».';
   }
   // The backend returns jobs in descending created_at / id order; skip unfinished jobs.
@@ -965,6 +998,14 @@ $('siteVoice').onclick=()=>{
 
 
 
+// D1 timestamps use UTC without a timezone suffix. Five minutes is the backend lease.
+function isStaleSiteJob(job,now=Date.now()){
+ if(!job||job.status!=='running'||Number(job.attempt_count)>=3)return false;
+ const timestamp=String(job.updated_at||'');
+ if(!/^\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d$/.test(timestamp))return false;
+ const time=Date.parse(timestamp.replace(' ','T')+'Z');
+ return Number.isFinite(time)&&now-time>5*60*1000;
+}
 // Persistent, recoverable site jobs. No autonomous background process is claimed:
 // "Avvia" makes one authenticated request and the result remains in D1.
 let siteJobsBusy=false;
@@ -984,8 +1025,9 @@ async function loadSiteJobs(){
    info.append(strong,small);box.append(info);
    const button=document.createElement('button');
    button.className='small-btn';button.type='button';button.dataset.jobId=job.id;
-   button.textContent=job.status==='completed'?'Apri sito':job.status==='running'?'In esecuzione':job.attempt_count>=3?'Tentativi esauriti':'Avvia';
-   button.disabled=job.status==='running'||(job.status!=='completed'&&job.attempt_count>=3);
+   const stalled=isStaleSiteJob(job);
+   button.textContent=job.status==='completed'?'Apri sito':stalled?'Recupera':job.status==='running'?'In esecuzione':job.attempt_count>=3?'Tentativi esauriti':'Avvia';
+   button.disabled=(job.status==='running'&&!stalled)||(job.status!=='completed'&&job.attempt_count>=3);
    box.append(button);list.append(box);
   }
   status.textContent=result.jobs.length?'Lavori recuperati: '+result.jobs.length+'. I lavori non vengono eseguiti in background.':'Non ci sono incarichi salvati.';
@@ -1029,7 +1071,7 @@ $('siteJobsList').onclick=async event=>{
   if(job.status==='completed'){
    await openSiteJob(job);$('siteJobsStatus').textContent='Lavoro completato: sito riaperto dal Cloud.';
   }else{
-   if(job.status==='running')throw Error('Lavoro già in esecuzione. Aggiorna la lista.');
+   if(job.status==='running'&&!isStaleSiteJob(job))throw Error('Lavoro ancora in esecuzione: non è possibile recuperarlo prima di cinque minuti.');
    if(job.attempt_count>=3)throw Error('Tre tentativi esauriti. Crea un nuovo lavoro.');
    $('siteJobsStatus').textContent='JARVIS sta generando il sito. Puoi recuperare il risultato dalla coda…';
    const run=await post('/api/site-jobs/'+encodeURIComponent(jobId)+'/run',{});
