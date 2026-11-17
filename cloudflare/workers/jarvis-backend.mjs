@@ -143,7 +143,7 @@ async function jarvisAutonomyDiagnostics(env,trigger='scheduled'){
   const [integrity,core,backup,stage,regression,approvals,rollback]=await Promise.all([
    env.DB.prepare('PRAGMA quick_check').all(),
    env.DB.prepare('SELECT (SELECT count(*) FROM projects) AS projects,(SELECT count(*) FROM tasks) AS tasks').first(),
-   env.DB.prepare('SELECT verdict,snapshot_id,created_at FROM backup_export_health_checks WHERE verdict IN ('passed','unchanged','failed') ORDER BY created_at DESC,id DESC LIMIT 1').first(),
+   env.DB.prepare("SELECT verdict,snapshot_id,created_at FROM backup_export_health_checks WHERE verdict IN ('passed','unchanged','failed') ORDER BY created_at DESC,id DESC LIMIT 1").first(),
    env.DB.prepare('SELECT verdict,runtime_tests,runtime_passed,created_at FROM staging_auto_checks ORDER BY created_at DESC LIMIT 1').first(),
    env.DB.prepare('SELECT status,tests_total,tests_passed,cleanup_passed,created_at FROM staging_regression_runs ORDER BY created_at DESC LIMIT 1').first(),
    env.DB.prepare("SELECT count(*) AS n FROM action_proposals WHERE status='pending'").first(),
