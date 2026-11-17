@@ -6,7 +6,7 @@
     "cloudflare/workers/jarvis-backend.mjs": {
       "cloudflare_name": "jarvis-backend",
       "version_id": "89f66668-175c-41ce-926c-b45aceef1f06",
-      "sha256": "921d28c66232e86e4a0e86cf105fed98fb656d7c2940a6853cdeb6a89c8ad9cc"
+      "sha256": "8d1d6287b097794850bb1a1832e9dba7a3568a9ddf0d4813175c421ed0fb1430"
     },
     "cloudflare/workers/jarvis-staging.mjs": {
       "cloudflare_name": "jarvis-staging",
