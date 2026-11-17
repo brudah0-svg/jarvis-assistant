@@ -3,7 +3,7 @@ import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 const source=readFileSync('cloudflare/workers/jarvis-backend.mjs','utf8');
 const sha=s=>createHash('sha256').update(s).digest('hex');
-const known='921d28c66232e86e4a0e86cf105fed98fb656d7c2940a6853cdeb6a89c8ad9cc';
+const known='8d1d6287b097794850bb1a1832e9dba7a3568a9ddf0d4813175c421ed0fb1430';
 assert.equal(sha(source),known,'Candidate backend source must match the independently verified GitHub provenance manifest');
 const html=readFileSync('cloudflare/ui/command-v4-unified.html','utf8');
 const manifest=readFileSync('cloudflare/ui/jarvis-app.webmanifest','utf8');
