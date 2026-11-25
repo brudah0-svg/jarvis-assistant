@@ -217,6 +217,7 @@ function cancelSingleRecognition(){
  if(r){r.onresult=r.onerror=r.onend=null;try{r.abort?.()}catch{}}
 }
 let pendingVoiceAction=null; // One short-lived, low-risk operation awaiting explicit spoken confirmation.
+let pendingWebsiteBrief=null; // One-turn clarification, never persisted or inferred by AI.
 function dialogueStatus(message){$('dialogueStatus').textContent=message}
 function dialogueUi(){$('dialogueBtn').setAttribute('aria-pressed',String(dialogueActive));$('dialogueBtn').textContent=dialogueActive?'⏹ Termina dialogo':'🎧 Avvia dialogo'}
 function cancelDialogueRecognition(){
@@ -225,7 +226,7 @@ function cancelDialogueRecognition(){
 }
 function stopDialogue(reason){
  dialogueActive=false;dialogueEpoch++;clearTimeout(dialogueTimer);cancelDialogueRecognition();
- pendingVoiceAction=null;dialoguePending=false;dialogueSpeaking=false;
+ pendingVoiceAction=null;pendingWebsiteBrief=null;dialoguePending=false;dialogueSpeaking=false;
  try{window.speechSynthesis?.cancel()}catch{}
  dialogueUi();dialogueStatus(reason||'Dialogo terminato.');
 }
@@ -304,7 +305,7 @@ $('dialogueBtn').onclick=()=>{
  voiceOutputEnabled=true;$('voiceOutputBtn').setAttribute('aria-pressed','true');$('voiceOutputBtn').textContent='🔊 Voce ON';
  dialogueUi();jarvisSpeak('Sì, signore. Ti ascolto.');
 };
-document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelSingleRecognition();if(dialogueActive)stopDialogue('Pagina non in primo piano: dialogo fermato. Riavvialo quando torni.')}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){pendingVoiceAction=null;pendingWebsiteBrief=null;cancelSingleRecognition();if(dialogueActive)stopDialogue('Pagina non in primo piano: dialogo fermato. Riavvialo quando torni.')}});
 $('voiceOutputBtn').onclick=()=>{
  if(!window.speechSynthesis){say('Sintesi vocale non supportata.');return}
  voiceOutputEnabled=!voiceOutputEnabled;$('voiceOutputBtn').setAttribute('aria-pressed',String(voiceOutputEnabled));
@@ -478,15 +479,29 @@ function parseJarvisCoreCommand(message){
   .replace(/^(?:e\s+)?(?:(?:ciao|salve|buongiorno|buonasera|ehi|hey)\s+)?jarvis[\s,:;.!?-]*/i,'')
   .replace(/^(?:ciao|salve|buongiorno|buonasera)[\s,:;.!?-]+(?:ehi|hey)?\s*jarvis[\s,:;.!?-]*/i,'')
   .trim();
- // Spoken confirmation is valid only for the exact project/task prepared in this session.
- // An unrelated utterance cancels it: later generic affirmations cannot trigger a write.
+ // Confirmation applies only to the exact pending operation. A question is not consent.
+ const affirmative=/^(?:s[ìi](?:[ ,]+confermo)?|confermo|procedi)[.!]*$/i;
+ const ambiguous=/^(?:s[ìi](?:[ ,]+confermo)?|confermo|procedi|va bene)[.!?？]*$/i;
+ const negative=/^(?:no(?:[ ,]+annulla)?|annulla|lascia stare|non farlo)[.!]*$/i;
  if(pendingVoiceAction){
   const waiting=pendingVoiceAction;pendingVoiceAction=null;
   if(Date.now()<=waiting.expiresAt){
-   if(/^(?:s[ìi](?:[ ,]+confermo)?|confermo|procedi|va bene)[.!?]*$/i.test(input))
-    return {...waiting.command,voiceConfirmed:true};
-   if(/^(?:no(?:[ ,]+annulla)?|annulla|lascia stare|non farlo)[.!?]*$/i.test(input))
-    return {kind:'voice-cancel'};
+   if(affirmative.test(input))return {...waiting.command,voiceConfirmed:true};
+   if(negative.test(input))return {kind:'voice-cancel'};
+   if(ambiguous.test(input)){pendingVoiceAction=waiting;return {kind:'voice-confirm-clarify'}}
+  }else if(ambiguous.test(input)||negative.test(input))return {kind:'voice-confirm-expired'};
+ }
+ // A missing website recipient can be supplied in one immediate follow-up.
+ // Only an explicit "per <recipient>" resumes the request; unrelated turns cancel it.
+ if(pendingWebsiteBrief){
+  const waiting=pendingWebsiteBrief;pendingWebsiteBrief=null;
+  if(Date.now()<=waiting.expiresAt){
+   if(negative.test(input))return {kind:'voice-cancel'};
+   const follow=input.match(/^per\s+(.+)$/i);
+   if(follow&&!/[?？]/.test(input)){
+    const target=follow[1].replace(/[,;]?\s+(?:per\s+favore|perfavore|grazie|per\s+piacere)[.!]*$/i,'').replace(/[.!]+$/,'').trim();
+    if(target.length>=3&&target.length<=850)return {kind:'website',title:target};
+   }
   }
  }
  // Android recognition sometimes inserts «è» between the wake name and the command.
@@ -613,6 +628,8 @@ function showMultipageProjectInChat(project){
 }
 async function runJarvisCoreCommand(command){
  if(command.kind==='voice-cancel')return 'Ricevuto, signore. Operazione annullata: nessuna modifica al Cloud.';
+ if(command.kind==='voice-confirm-clarify')return 'Per sicurezza, conferma esplicitamente con «Sì, confermo» oppure annulla con «No, annulla». Nessuna modifica eseguita.';
+ if(command.kind==='voice-confirm-expired')return 'La conferma è scaduta. Ripeti il comando originale: nessuna modifica eseguita.';
  if(command.kind==='health-status'){
   const health=await api('/api/autonomy/status');
   if(!health||!['healthy','attention','blocked','not_run'].includes(health.status)||
@@ -717,7 +734,10 @@ async function runJarvisCoreCommand(command){
     ' Questo controllo riguarda struttura e dati del progetto, non una revisione automatica del codice. QA Guardian verifica il codice separatamente su GitHub. Non ho modificato né distribuito codice; serve approvazione per gli aggiornamenti importanti.';
  }
 
- if(command.kind==='website-clarify')return 'Ho capito che vuoi creare un sito, ma la dettatura non è abbastanza chiara. Dimmi per chi deve essere il sito, ad esempio «Jarvis, creami un sito web per un idraulico». Nessun lavoro è stato avviato.';
+ if(command.kind==='website-clarify'){
+  pendingWebsiteBrief={expiresAt:Date.now()+90000};
+  return 'Certamente, signore. Per chi devo creare il sito? Puoi rispondere semplicemente «Per un idraulico». Nessun lavoro è stato ancora avviato.';
+ }
  if(command.kind==='project-clarify')return 'Posso creare un progetto nel Cloud, ma mi serve un nome preciso. Prova: «Jarvis, mi crei un progetto per il sito di un elettricista». Non ho creato nulla.';
 
  if(command.kind==='multi-open'){
