@@ -211,6 +211,11 @@ function notice(message,kind='status'){const el=$('cloudNotice');el.textContent=
 let voiceOutputEnabled=false;
 let dialogueActive=false,dialogueListening=false,dialogueSpeaking=false,dialoguePending=false;
 let dialogueRecognition=null,dialogueEpoch=0,dialogueErrors=0,dialogueTimer=0;
+let singleRecognition=null;
+function cancelSingleRecognition(){
+ const r=singleRecognition;singleRecognition=null;
+ if(r){r.onresult=r.onerror=r.onend=null;try{r.abort?.()}catch{}}
+}
 let pendingVoiceAction=null; // One short-lived, low-risk operation awaiting explicit spoken confirmation.
 function dialogueStatus(message){$('dialogueStatus').textContent=message}
 function dialogueUi(){$('dialogueBtn').setAttribute('aria-pressed',String(dialogueActive));$('dialogueBtn').textContent=dialogueActive?'⏹ Termina dialogo':'🎧 Avvia dialogo'}
@@ -264,6 +269,7 @@ function listenDialogue(){
 function jarvisSpeak(message){
  if(!voiceOutputEnabled||!window.speechSynthesis||typeof SpeechSynthesisUtterance==='undefined')return;
  try{
+  cancelSingleRecognition();
   if(dialogueActive)cancelDialogueRecognition();
   window.speechSynthesis.cancel();
   const speech=new SpeechSynthesisUtterance(String(message).slice(0,950)),epoch=dialogueEpoch;
@@ -293,11 +299,12 @@ $('dialogueBtn').onclick=()=>{
  if(!window.speechSynthesis||!(window.SpeechRecognition||window.webkitSpeechRecognition)){
   dialogueStatus('Browser non compatibile. Prova Chrome Android o usa la chat scritta.');return
  }
+ cancelSingleRecognition();
  dialogueActive=true;dialogueErrors=0;dialoguePending=false;dialogueSpeaking=false;dialogueEpoch++;
  voiceOutputEnabled=true;$('voiceOutputBtn').setAttribute('aria-pressed','true');$('voiceOutputBtn').textContent='🔊 Voce ON';
  dialogueUi();jarvisSpeak('Sì, signore. Ti ascolto.');
 };
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&dialogueActive)stopDialogue('Pagina non in primo piano: dialogo fermato. Riavvialo quando torni.')});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelSingleRecognition();if(dialogueActive)stopDialogue('Pagina non in primo piano: dialogo fermato. Riavvialo quando torni.')}});
 $('voiceOutputBtn').onclick=()=>{
  if(!window.speechSynthesis){say('Sintesi vocale non supportata.');return}
  voiceOutputEnabled=!voiceOutputEnabled;$('voiceOutputBtn').setAttribute('aria-pressed',String(voiceOutputEnabled));
@@ -876,12 +883,26 @@ $('chatForm').onsubmit=async e=>{
   }
  }
 };
-$('voiceBtn').onclick=()=>{if(dialogueActive){dialogueStatus('Il dialogo è già attivo: parla normalmente.');return}if(!voiceOutputEnabled&&'speechSynthesis' in window){voiceOutputEnabled=true;$('voiceOutputBtn').textContent='🔊 Voce ON';$('voiceOutputBtn').setAttribute('aria-pressed','true')}
-
+$('voiceBtn').onclick=()=>{
+ if(dialogueActive){dialogueStatus('Il dialogo è già attivo: parla normalmente.');return}
+ if(chatBusy||document.hidden||window.speechSynthesis?.speaking||window.speechSynthesis?.pending||singleRecognition)return;
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){say('Dettatura non supportata dal browser. Usa la tastiera Android.');return}
- const recognition=new SR();recognition.lang='it-IT';recognition.onresult=e=>{const spoken=e.results[0][0].transcript;$('chatInput').value=spoken;if(spoken.trim()){$('chatForm').requestSubmit()}};recognition.onerror=()=>say('Errore della dettatura.');recognition.start();
+ if(!voiceOutputEnabled&&'speechSynthesis' in window){voiceOutputEnabled=true;$('voiceOutputBtn').textContent='🔊 Voce ON';$('voiceOutputBtn').setAttribute('aria-pressed','true')}
+ const r=new SR();singleRecognition=r;
+ r.lang='it-IT';r.continuous=false;r.interimResults=false;r.maxAlternatives=1;
+ r.onresult=e=>{
+  if(singleRecognition!==r||dialogueActive||chatBusy||document.hidden||window.speechSynthesis?.speaking||window.speechSynthesis?.pending){if(singleRecognition===r)cancelSingleRecognition();return}
+  const spoken=String(e.results?.[0]?.[0]?.transcript||'').trim().slice(0,1500);
+  if(!spoken)return;
+  cancelSingleRecognition();
+  $('chatInput').value=spoken;$('chatForm').requestSubmit();
+ };
+ r.onerror=()=>{if(singleRecognition===r){cancelSingleRecognition();say('Errore della dettatura.')}};
+ r.onend=()=>{if(singleRecognition===r)singleRecognition=null};
+ try{r.start()}catch{cancelSingleRecognition();say('Impossibile avviare il microfono. Verifica i permessi Android.')}
 };
+
 
 // User-initiated import, never a background or cross-origin localStorage read.
 // The original JSON remains on the Android device. Operations are additive and require confirmation.
