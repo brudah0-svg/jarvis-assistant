@@ -504,6 +504,12 @@ function parseJarvisCoreCommand(message){
    }
   }
  }
+ // Explicit memory requests are different from reminders and advisory questions.
+ const saveMemory=input.match(/^(?:ricorda(?:ti)?\s+che|memorizza(?:\s+che)?|salva\s+(?:nella|in)\s+memoria)\s*[:,-]?\s+(.+)$/i);
+ if(saveMemory&&!/[?？]\s*$/.test(input))return {kind:'memory-save',content:saveMemory[1].trim()};
+ const recallMemory=input.match(/^(?:(?:cosa\s+ricordi|cosa\s+hai\s+memorizzato)\s+(?:di\s+|su\s+|del(?:la|lo|le|li)?\s+|dei\s+|degli\s+|dell['’]|sul(?:la|lo|le|li)?\s+|sui\s+|sugli\s+|sull['’])|cerca\s+(?:nella|in)\s+memoria\s*[:,-]?\s+)(.+)$/i);
+ if(recallMemory)return {kind:'memory-recall',query:recallMemory[1].replace(/[?？.!]+$/,'').trim()};
+ if(/^(?:cosa\s+ricordi|cosa\s+hai\s+memorizzato|mostra(?:mi)?\s+i\s+(?:miei\s+)?ricordi)[.!?？]*$/i.test(input))return {kind:'memory-recall',query:''};
  // Android recognition sometimes inserts «è» between the wake name and the command.
  // Normalize only for the autoimprovement intent, leaving other actions unchanged.
  const autoIntent=input.replace(/^(?:è|e)\s+(?=(?:miglior|auto[- ]?miglior))/i,'');
@@ -626,7 +632,35 @@ function showMultipageProjectInChat(project){
  toolbar.append(download);iframe.srcdoc=files['index.html'];
  wrapper.append(toolbar,iframe);$('conversation').append(wrapper);$('conversation').scrollTop=$('conversation').scrollHeight;
 }
+// Personal memory is distinct from internal automation queues and operational metadata.
+const personalMemoryCategories=new Set(['Preferenze','Obiettivi','Progetti','Decisioni','Altro']);
+function memoryKey(value){return String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('it').replace(/\s+/g,' ').trim()}
+async function runPersonalMemoryCommand(command){
+ const saving=command.kind==='memory-save';
+ const content=saving?String(command.content||'').trim():'';
+ if(saving&&(!content||content.length>500))return 'Il ricordo deve contenere da 1 a 500 caratteri. Nessuna memoria salvata.';
+ const result=await api('/api/memory');
+ if(result?.status!=='ok'||!Array.isArray(result.memories))throw Error('Archivio memoria Cloud non verificabile.');
+ const records=result.memories.filter(m=>m&&personalMemoryCategories.has(m.category)&&typeof m.content==='string'&&m.content.trim());
+ if(saving){
+  // Preserve exact user text. Do not infer categories or trigger an internal workflow.
+  if(records.some(m=>memoryKey(m.content)===memoryKey(content)))return 'Questo ricordo è già presente nel tuo archivio Cloud. Nessun duplicato creato.';
+  const saved=await post('/api/memory',{content,category:'Altro'});
+  if(saved?.status!=='created'||typeof saved.memory?.id!=='string'||!saved.memory.id||saved.memory.content!==content||saved.memory.category!=='Altro')
+   throw Error('Il server non ha confermato il ricordo esatto. Controlla l’archivio prima di riprovare.');
+  // A refresh failure must not turn a confirmed save into an apparent failed write.
+  try{await loadAll()}catch{}
+  return 'Memoria salvata nel Cloud, signore: «'+content+'».';
+ }
+ const query=memoryKey(command.query);
+ const matches=records.filter(m=>!query||memoryKey(m.content+' '+m.category).includes(query));
+ const coverage=result.memories.length>=200?' Ho consultato soltanto le ultime 200 voci disponibili.':'';
+ if(!matches.length)return 'Non ho trovato ricordi personali corrispondenti nell’archivio consultato.'+coverage;
+ return 'Ricordi verificati nel Cloud:\n'+matches.slice(0,5).map(m=>'• '+m.content).join('\n')+
+  (matches.length>5?'\nMostro i primi 5 di '+matches.length+' risultati.':'' )+coverage;
+}
 async function runJarvisCoreCommand(command){
+ if(command.kind==='memory-save'||command.kind==='memory-recall')return runPersonalMemoryCommand(command);
  if(command.kind==='voice-cancel')return 'Ricevuto, signore. Operazione annullata: nessuna modifica al Cloud.';
  if(command.kind==='voice-confirm-clarify')return 'Per sicurezza, conferma esplicitamente con «Sì, confermo» oppure annulla con «No, annulla». Nessuna modifica eseguita.';
  if(command.kind==='voice-confirm-expired')return 'La conferma è scaduta. Ripeti il comando originale: nessuna modifica eseguita.';
