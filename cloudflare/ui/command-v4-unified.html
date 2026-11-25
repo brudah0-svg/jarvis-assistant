@@ -238,7 +238,7 @@ function listenDialogue(){
  r.lang='it-IT';r.continuous=false;r.interimResults=false;r.maxAlternatives=1;
  dialogueRecognition=r;dialogueListening=true;
  r.onresult=e=>{
-  if(!dialogueActive||epoch!==dialogueEpoch||dialoguePending)return;
+  if(!dialogueActive||epoch!==dialogueEpoch||dialogueRecognition!==r||dialoguePending||dialogueSpeaking||chatBusy||document.hidden)return;
   const text=String(e.results?.[0]?.[0]?.transcript||'').trim().slice(0,1500);
   if(!text)return;
   dialogueErrors=0;dialoguePending=true;cancelDialogueRecognition();
@@ -247,14 +247,14 @@ function listenDialogue(){
   $('chatInput').value=text;$('chatForm').requestSubmit();
  };
  r.onerror=e=>{
-  if(!dialogueActive||epoch!==dialogueEpoch)return;
+  if(!dialogueActive||epoch!==dialogueEpoch||dialogueRecognition!==r)return;
   if(['not-allowed','service-not-allowed','audio-capture'].includes(e.error)){stopDialogue('Microfono non autorizzato o non disponibile.');return}
   if(++dialogueErrors>=4){stopDialogue('Riconoscimento instabile. Riavvia il dialogo quando vuoi.');return}
   dialogueStatus('Non ho capito bene. Riprovo…');
  };
  r.onend=()=>{
-  if(epoch!==dialogueEpoch)return;
-  if(dialogueRecognition===r)dialogueRecognition=null;
+  if(epoch!==dialogueEpoch||dialogueRecognition!==r)return;
+  dialogueRecognition=null;
   dialogueListening=false;
   if(!dialoguePending)resumeDialogue();
  };
@@ -826,6 +826,7 @@ $('chatForm').onsubmit=async e=>{
  if(STATIC_PREVIEW||chatBusy)return;
  const message=$('chatInput').value.trim();if(!message)return;
  chatRevision++;chatBusy=true;
+ if(dialogueActive){dialoguePending=true;cancelDialogueRecognition();}
  $('chatInput').value='';say(message,'user');
  const submit=$('chatForm').querySelector('.send');submit.disabled=true;
  try{
