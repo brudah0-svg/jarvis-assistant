@@ -843,10 +843,11 @@ async function runJarvisCoreCommand(command){
 
  if(command.kind==='plan'){
   if(command.title.length<5||command.title.length>900)return 'Descrivi un obiettivo tra 5 e 900 caratteri. Nessuna modifica eseguita.';
-  const result=await post('/api/plan',{goal:command.title});
-  if(result.status!=='proposal'||!Array.isArray(result.steps)||result.steps.length<1||result.requires_approval!==true)throw Error('Il server non ha restituito una bozza verificabile.');
-  const points=result.steps.slice(0,10).map((x,i)=>(i+1)+'. '+String(x.title||'Passaggio da definire')).join('\n');
-  return 'Bozza operativa per «'+command.title+'»:\n'+points+'\nNessuna attività creata: è una proposta da revisionare nel Planner.';
+  const result=await post('/api/core-plan',{goal:command.title});
+  if(result?.status!=='proposal'||result.engine!=='core-ai-v1'||result.goal!==command.title||result.requires_approval!==true||result.operations_executed!==false||result.saved!==false||!Array.isArray(result.steps)||result.steps.length<3||result.steps.length>6||!Array.isArray(result.assumptions)||result.assumptions.length>3||result.assumptions.some(x=>typeof x!=='string'||!x.trim()||x.length>140))throw Error('Il server non ha restituito una bozza AI verificabile.');
+  if(result.steps.some((x,i)=>!x||x.order!==i+1||x.status!=='pending'||typeof x.title!=='string'||!x.title.trim()||x.title.length>140||typeof x.check!=='string'||!x.check.trim()||x.check.length>160||!Array.isArray(x.depends_on)||x.depends_on.some(n=>!Number.isInteger(n)||n<1||n>=x.order)||new Set(x.depends_on).size!==x.depends_on.length))throw Error('Passaggi del piano non verificabili.');
+  const points=result.steps.map(x=>x.order+'. '+x.title+' — Verifica: '+x.check+(x.depends_on.length?' (dopo '+x.depends_on.join(', ')+')':'')).join('\n');
+  return 'Bozza AI per «'+command.title+'»:\n'+points+(result.assumptions.length?'\nIpotesi da verificare: '+result.assumptions.join('; '):'')+'\nNessuna attività creata o azione eseguita. Bozza non salvata come progetto. Qualsiasi spesa richiede autorizzazione separata.';
  }
  if(command.title.length<2||command.title.length>160)return 'Il titolo deve avere tra 2 e 160 caratteri. Non ho creato nulla.';
  if(command.kind==='project'){
