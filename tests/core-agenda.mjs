@@ -35,6 +35,8 @@ const parser=html.slice(html.indexOf('function parseJarvisCoreCommand('),html.in
 const ctx=new Function('let pendingVoiceAction=null,pendingWebsiteBrief=null;\n'+parser+'\nreturn parseJarvisCoreCommand')();
 assert.equal(ctx('Jarvis, '+message).kind,'agenda-save');
 assert.equal(ctx('Mostra agenda domani').period,'tomorrow');
+assert.equal(ctx('Mostrami gli appuntamenti della settimana').period,'week');
+assert.equal(ctx('Mostrami la mia agenda').period,'today');
 assert.equal(ctx('Fammi il briefing della giornata').period,'today');
 assert.equal(ctx('Ricorda che la macchina è nera').kind,'memory-save');
 console.log('PASS agenda: Rome calendar, DST, ambiguity, confirmation, duplicate guard, list and command routing; mocked D1, no AI.');
