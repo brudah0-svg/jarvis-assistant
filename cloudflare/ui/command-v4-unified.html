@@ -511,7 +511,7 @@ function parseJarvisCoreCommand(message){
  if(registerPlan&&!/[?？]\s*$/.test(input))return {kind:'plan-register',projectName:registerPlan[1].replace(/[.!]+$/,'').trim()};
  const diagnostic=input.match(/^(?:esegui\s+(?:la\s+)?diagnostica\s+(?:del|sul)\s+progetto|controlla\s+(?:il\s+)?progetto)\s+(.+)$/i);
  if(diagnostic&&!/[?？]\s*$/.test(input))return {kind:'project-diagnostic',projectName:diagnostic[1].replace(/[.!]+$/,'').trim()};
- const agendaList=input.match(/^(?:(?:mostra(?:mi)?|leggi|dimmi)\s+(?:(?:la|mia|i miei)\s+)?(?:agenda|appuntamenti|promemoria)|(?:cosa|che impegni)\s+ho\s+(?:in agenda|da fare)|(?:fammi\s+)?(?:il\s+)?briefing(?:\s+(?:della giornata|giornaliero))?|agenda)(?:\s+(oggi|domani|(?:questa\s+)?settimana|prossimi\s+7\s+giorni))?[.!?]*$/i);
+ const agendaList=input.match(/^(?:(?:mostra(?:mi)?|leggi|dimmi)\s+(?:(?:la(?: mia)?|mia|gli|i(?: miei)?)\s+)?(?:agenda|appuntamenti|promemoria)|(?:cosa|che impegni)\s+ho\s+(?:in agenda|da fare)|(?:fammi\s+)?(?:il\s+)?briefing(?:\s+(?:della giornata|giornaliero))?|agenda)(?:\s+(oggi|domani|(?:(?:questa|della)\s+)?settimana|(?:dei\s+)?prossimi\s+7\s+giorni))?[.!?]*$/i);
  if(agendaList)return {kind:'agenda-list',period:agendaList[1]?.toLowerCase()==='domani'?'tomorrow':/settimana|7/i.test(agendaList[1]||'')?'week':'today'};
  if(!/[?？]/.test(input)&&(/^(?:(?:aggiungi|registra|segna|metti|inserisci|crea)\s+(?:in agenda\s+)?(?:(?:un|una|il|la)\s+)?(?:appuntamento|promemoria|impegno)|ricordami(?:\s+di)?|appuntamento|promemoria)\b/i.test(input)&&!/^ricordami\s+che\b/i.test(input)||/^(?:oggi|domani|dopodomani|luned[ìi]|marted[ìi]|mercoled[ìi]|gioved[ìi]|venerd[ìi]|sabato|domenica|\d{1,4}[-/ ])[^?？]*\b(?:appuntamento|promemoria)\b/i.test(input)))return {kind:'agenda-save',message:input};
  // Explicit memory requests are different from reminders and advisory questions.
@@ -768,6 +768,7 @@ async function runVerifiedSelfAudit(){
 }
 async function runJarvisCoreCommand(command){
  if(command.kind==='agenda-list'||command.kind==='agenda-save'){
+  try{
   const valid=x=>x&&typeof x.title==='string'&&x.title.length>=3&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)&&/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(x.time)&&x.timezone==='Europe/Rome';
   const label=x=>x.date.split('-').reverse().join('/')+' alle '+x.time+' — '+x.title;
   if(command.kind==='agenda-list'){
@@ -785,6 +786,7 @@ async function runJarvisCoreCommand(command){
   const r=await post('/api/core-agenda',{action:'save',message:command.message,expected:command.entry,confirmed:true});
   if(r?.status!=='saved'||typeof r.created!=='boolean'||r.external_actions_executed!==false||r.push_scheduled!==false||!valid(r.entry)||!/^agenda-/.test(r.entry.id)||Object.keys(command.entry).some(k=>r.entry[k]!==command.entry[k]))throw Error('Salvataggio agenda non confermato.');
   return (r.created?'Registrato in agenda: ':'Già presente in agenda: ')+label(r.entry)+'. Non è impostata una notifica a orario né una sincronizzazione con calendari esterni.';
+  }catch(err){return 'Agenda: '+String(err?.message||'servizio non disponibile')+'. Nessuna nuova operazione confermata.';}
  }
  if(command.kind==='project-diagnostic')return runProjectDiagnostic(command);
  if(command.kind==='plan-register')return runCorePlanRegistration(command);
