@@ -218,6 +218,7 @@ function cancelSingleRecognition(){
 }
 let pendingVoiceAction=null; // One short-lived, low-risk operation awaiting explicit spoken confirmation.
 let pendingWebsiteBrief=null; // One-turn clarification, never persisted or inferred by AI.
+let lastCorePlan=null; // Current unsaved draft; only explicit registration can create tasks.
 function dialogueStatus(message){$('dialogueStatus').textContent=message}
 function dialogueUi(){$('dialogueBtn').setAttribute('aria-pressed',String(dialogueActive));$('dialogueBtn').textContent=dialogueActive?'⏹ Termina dialogo':'🎧 Avvia dialogo'}
 function cancelDialogueRecognition(){
@@ -504,6 +505,8 @@ function parseJarvisCoreCommand(message){
    }
   }
  }
+ const registerPlan=input.match(/^(?:registra|salva|aggiungi)\s+(?:il\s+)?(?:ultimo\s+)?piano\s+(?:nel|al)\s+progetto\s+(.+)$/i);
+ if(registerPlan&&!/[?？]\s*$/.test(input))return {kind:'plan-register',projectName:registerPlan[1].replace(/[.!]+$/,'').trim()};
  // Explicit memory requests are different from reminders and advisory questions.
  const saveMemory=input.match(/^(?:ricorda(?:ti)?\s+che|memorizza(?:\s+che)?|salva\s+(?:nella|in)\s+memoria)\s*[:,-]?\s+(.+)$/i);
  if(saveMemory&&!/[?？]\s*$/.test(input))return {kind:'memory-save',content:saveMemory[1].trim()};
@@ -659,7 +662,34 @@ async function runPersonalMemoryCommand(command){
  return 'Ricordi verificati nel Cloud:\n'+matches.slice(0,5).map(m=>'• '+m.content).join('\n')+
   (matches.length>5?'\nMostro i primi 5 di '+matches.length+' risultati.':'' )+coverage;
 }
+async function runCorePlanRegistration(command){
+ if(command.voiceConfirmed){
+  const draft=command.registration;
+  if(!draft||Date.now()>draft.expiresAt)return 'La registrazione è scaduta. Nessuna attività registrata.';
+  const result=await post('/api/core-plan/register',{project_id:draft.projectId,registration_id:draft.token,goal:draft.goal,steps:draft.steps,assumptions:draft.assumptions,confirmed:true});
+  const expected=draft.steps.map(s=>draft.token+'-'+s.order);
+  if(result?.status!=='registered'||result.project_id!==draft.projectId||result.registration_id!==draft.token||result.verified_tasks!==expected.length||![0,expected.length].includes(result.created_tasks)||result.external_actions_executed!==false||!Array.isArray(result.task_ids)||result.task_ids.length!==expected.length||!expected.every(id=>result.task_ids.includes(id)))throw Error('Registrazione non verificata. Puoi ripetere la registrazione dello stesso piano per controllare il risultato.');
+  if(lastCorePlan?.token===draft.token)lastCorePlan=null;
+  try{await loadAll()}catch{}
+  return (result.created_tasks?'Ho registrato ':'Ho verificato la registrazione già esistente di ')+expected.length+' attività nel progetto «'+draft.projectName+'». Sono attività da svolgere, non lavori eseguiti. Nessuna azione esterna o spesa.';
+ }
+ const plan=lastCorePlan;
+ if(!plan||Date.now()>plan.expiresAt)return 'Non ho una bozza AI recente da registrare. Prima chiedimi di pianificare un obiettivo.';
+ const projects=await api('/api/projects');
+ if(projects?.status!=='ok'||!Array.isArray(projects.projects))throw Error('Elenco progetti non verificabile.');
+ const key=s=>String(s||'').trim().toLocaleLowerCase('it');
+ const matches=projects.projects.filter(p=>p.status==='active'&&key(p.name)===key(command.projectName)&&typeof p.id==='string');
+ if(matches.length!==1)return 'Non trovo un unico progetto attivo con questo nome. Indica il nome esatto; nessuna attività registrata.';
+ const p=matches[0];
+ const registration={...plan,projectId:p.id,projectName:p.name};
+ // Bind token to one project after its first registration request to make retries safe.
+ if(plan.projectId&&plan.projectId!==p.id)return 'Questa bozza è già associata a un altro progetto. Genera una nuova bozza per cambiare destinazione.';
+ plan.projectId=p.id;
+ pendingVoiceAction={command:{kind:'plan-register',registration},expiresAt:Math.min(plan.expiresAt,Date.now()+90000)};
+ return 'Vuoi registrare '+plan.steps.length+' attività da svolgere nel progetto «'+p.name+'» per l’obiettivo «'+plan.goal+'»? Rispondi «Sì, confermo» o «No, annulla». Nessuna attività ancora registrata.';
+}
 async function runJarvisCoreCommand(command){
+ if(command.kind==='plan-register')return runCorePlanRegistration(command);
  if(command.kind==='memory-save'||command.kind==='memory-recall')return runPersonalMemoryCommand(command);
  if(command.kind==='voice-cancel')return 'Ricevuto, signore. Operazione annullata: nessuna modifica al Cloud.';
  if(command.kind==='voice-confirm-clarify')return 'Per sicurezza, conferma esplicitamente con «Sì, confermo» oppure annulla con «No, annulla». Nessuna modifica eseguita.';
@@ -842,12 +872,14 @@ async function runJarvisCoreCommand(command){
  }
 
  if(command.kind==='plan'){
+  lastCorePlan=null;
   if(command.title.length<5||command.title.length>900)return 'Descrivi un obiettivo tra 5 e 900 caratteri. Nessuna modifica eseguita.';
   const result=await post('/api/core-plan',{goal:command.title});
   if(result?.status!=='proposal'||result.engine!=='core-ai-v1'||result.goal!==command.title||result.requires_approval!==true||result.operations_executed!==false||result.saved!==false||!Array.isArray(result.steps)||result.steps.length<3||result.steps.length>6||!Array.isArray(result.assumptions)||result.assumptions.length>3||result.assumptions.some(x=>typeof x!=='string'||!x.trim()||x.length>140))throw Error('Il server non ha restituito una bozza AI verificabile.');
   if(result.steps.some((x,i)=>!x||x.order!==i+1||x.status!=='pending'||typeof x.title!=='string'||!x.title.trim()||x.title.length>140||typeof x.check!=='string'||!x.check.trim()||x.check.length>160||!Array.isArray(x.depends_on)||x.depends_on.some(n=>!Number.isInteger(n)||n<1||n>=x.order)||new Set(x.depends_on).size!==x.depends_on.length))throw Error('Passaggi del piano non verificabili.');
+  lastCorePlan={goal:result.goal,steps:result.steps,assumptions:result.assumptions,token:crypto.randomUUID(),expiresAt:Date.now()+300000};
   const points=result.steps.map(x=>x.order+'. '+x.title+' — Verifica: '+x.check+(x.depends_on.length?' (dopo '+x.depends_on.join(', ')+')':'')).join('\n');
-  return 'Bozza AI per «'+command.title+'»:\n'+points+(result.assumptions.length?'\nIpotesi da verificare: '+result.assumptions.join('; '):'')+'\nNessuna attività creata o azione eseguita. Bozza non salvata come progetto. Qualsiasi spesa richiede autorizzazione separata.';
+  return 'Bozza AI per «'+command.title+'»:\n'+points+(result.assumptions.length?'\nIpotesi da verificare: '+result.assumptions.join('; '):'')+'\nNessuna attività creata o azione eseguita. Bozza non salvata come progetto. Per registrare le attività, di’ «Registra il piano nel progetto NOME». Qualsiasi spesa richiede autorizzazione separata.';
  }
  if(command.title.length<2||command.title.length>160)return 'Il titolo deve avere tra 2 e 160 caratteri. Non ho creato nulla.';
  if(command.kind==='project'){
