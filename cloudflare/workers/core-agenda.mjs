@@ -82,9 +82,16 @@ export async function coreAgendaRoute(request,env,now=new Date(),uuid=()=>crypto
    if(entries.some(x=>typeof x.id!=='string'||typeof x.title!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(x.date)||!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(x.time)))return fail(503,'Dati agenda non verificabili');
    return {status:200,data:{status:'listed',from,until,entries,truncated:r.results.length>30,external_actions_executed:false,push_scheduled:false}};
   }
-  if(body.action!=='save'||Object.keys(body).some(k=>!['action','message','confirmed'].includes(k))||body.confirmed!==true)return fail(400,'Conferma esplicita richiesta');
+  if(body.action==='preview'){
+   if(Object.keys(body).some(k=>!['action','message'].includes(k)))return fail(400,'Richiesta non valida');
+   const entry=parseAgendaRequest(body.message,now);
+   if(!entry)return fail(422,'Specifica titolo, una data futura e un orario preciso. Nessuna voce salvata.');
+   return {status:200,data:{status:'preview',entry,external_actions_executed:false,push_scheduled:false}};
+  }
+  if(body.action!=='save'||Object.keys(body).some(k=>!['action','message','confirmed','expected'].includes(k))||body.confirmed!==true)return fail(400,'Conferma esplicita richiesta');
   const entry=parseAgendaRequest(body.message,now);
   if(!entry)return fail(422,'Specifica titolo, una data futura e un orario preciso. Nessuna voce salvata.');
+  if(!body.expected||Object.keys(entry).some(k=>body.expected[k]!==entry[k]))return fail(409,'La data o il contenuto sono cambiati: ripeti il comando.');
   const description=agendaPrefix+entry.time,id='agenda-'+uuid();
   // Atomic duplicate guard and readback. No project mutation or external action.
   const where="project_id IS NULL AND id LIKE 'agenda-%' AND title=? AND due_date=? AND description=?";
