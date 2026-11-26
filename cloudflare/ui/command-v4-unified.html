@@ -528,13 +528,13 @@ function parseJarvisCoreCommand(message){
  if(/^(?:(?:mostra(?:mi)?|controlla|dimmi|verifica)\s+)?(?:lo\s+)?stato\s+(?:del\s+)?(?:tuo\s+)?(?:auto[- ]?)?miglioramento[.!?]*$/i.test(input)
     ||/^(?:come\s+sta\s+andando|a\s+che\s+punto\s+(?:è|e|sei))\s+(?:il\s+tuo\s+)?(?:auto[- ]?)?miglioramento[.!?]*$/i.test(input))
   return {kind:'autoimprove-status'};
- if(/^(?:(?:riprova|ritenta|ripeti)\s+(?:a\s+)?(?:migliorarti|auto[- ]?migliorarti|il\s+tuo\s+(?:auto[- ]?)?miglioramento)|(?:riprendi|riavvia)\s+(?:l['’])?(?:auto[- ]?)?miglioramento)[.!?]*$/i.test(input))
+ if(!/[?？]\s*$/.test(input)&&/^(?:(?:riprova|ritenta|ripeti)\s+(?:a\s+)?(?:migliorarti|auto[- ]?migliorarti|il\s+tuo\s+(?:auto[- ]?)?miglioramento)|(?:riprendi|riavvia)\s+(?:l['’])?(?:auto[- ]?)?miglioramento)[.!?]*$/i.test(input))
   return {kind:'autoimprove-retry'};
  // Explicit improvement request: queue a bounded proposal task. Do NOT perform code writes here.
- if(/^(?:(?:avvia|inizia|attiva)\s+(?:(?:il|l['’])\s*)?(?:processo\s+di\s+)?(?:auto[- ]?)?miglioramento|(?:auto[- ]?)?migliorati|migliora(?:ti)?(?:\s+(?:autonomamente|automaticamente|da\s+solo|il\s+tuo\s+codice|te\s+stesso))|(?:inizia|comincia)\s+a\s+(?:auto[- ]?)?migliorarti)(?:\s+(?:da\s+solo|autonomamente|automaticamente))?[.!?]*$/i.test(autoIntent))
+ if(!/[?？]\s*$/.test(input)&&/^(?:(?:avvia|inizia|attiva)\s+(?:(?:il|l['’])\s*)?(?:processo\s+di\s+)?(?:auto[- ]?)?miglioramento|(?:auto[- ]?)?migliorati|migliora(?:ti)?(?:\s+(?:autonomamente|automaticamente|da\s+solo|il\s+tuo\s+codice|te\s+stesso))|(?:inizia|comincia)\s+a\s+(?:auto[- ]?)?migliorarti)(?:\s+(?:da\s+solo|autonomamente|automaticamente))?[.!?]*$/i.test(autoIntent))
   return {kind:'autoimprove'};
  // The user asks JARVIS to inspect itself; never interpret this as permission to deploy code.
- if(/^(?:(?:auto)?analizzati|analizza il tuo (?:codice|sistema)|controlla come migliorarti|migliorati|valuta come migliorarti)(?:\s+e\s+(?:proponi|prepara)(?:\s+(?:dei|i))?\s+miglioramenti|\s+e\s+proponi\s+come\s+migliorarti)?[.!?]*$/i.test(input))
+ if(!/[?？]\s*$/.test(input)&&/^(?:(?:auto)?analizzati|analizza il tuo (?:codice|sistema)|controlla come migliorarti|migliorati|valuta come migliorarti)(?:\s+e\s+(?:proponi|prepara)(?:\s+(?:dei|i))?\s+miglioramenti|\s+e\s+proponi\s+come\s+migliorarti)?[.!?]*$/i.test(input))
   return {kind:'self-audit'};
  // Safe, deterministic routing: never let a free-form AI answer authorize a write.
  const multi=input.match(/^(?:crea|creami|costruisci|costruiscimi|realizza|fammi|sviluppa|preparami)\s+(?:(?:un|il)\s+)?(?:sito(?:\s+web)?\s+)?(?:multipagina|completo|a\s+(?:tre|3)\s+pagine)\s+(?:per|di)\s+(.+)$/i);
@@ -721,6 +721,46 @@ async function runProjectDiagnostic(command){
   (warnings.length?'\n'+findings+'\nProssimo passo: esamina gli avvisi prima di modificare il progetto.':'\nNessuna anomalia nei cinque controlli effettuati.')+
   '\nHo verificato il registro dei controlli. Nessuna correzione automatica, nessuna azione esterna, nessuna spesa.';
 }
+// A self-audit may create review proposals, but cannot apply changes.
+async function runVerifiedSelfAudit(){
+ const result=await api('/api/projects');
+ if(result?.status!=='ok'||!Array.isArray(result.projects))throw Error('Elenco progetti non verificabile.');
+ const projects=result.projects.filter(p=>p?.status==='active'&&String(p.name||'').trim().toLocaleLowerCase('it')==='jarvis'&&typeof p.id==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(p.id));
+ if(projects.length!==1)return 'Non trovo un unico progetto JARVIS attivo. Nessuna diagnostica o proposta avviata.';
+ const project=projects[0];
+ const started=await post('/api/executor/run',{project_id:project.id});
+ const validId=id=>typeof id==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id);
+ if(!started||!['completed','already_requested'].includes(started.status)||!validId(started.run_id))throw Error('Diagnostica non verificabile.');
+ if(started.status==='completed'&&(started.project_id!==project.id||started.read_only!==true||started.automatic_fix_applied!==false))throw Error('Avvio diagnostica incoerente.');
+ const evidence=await api('/api/executor/runs/'+encodeURIComponent(started.run_id));
+ const run=evidence?.run,checks=evidence?.checks;
+ if(evidence?.status!=='ok'||run?.id!==started.run_id||run.project_id!==project.id)throw Error('Rapporto non associato al progetto JARVIS.');
+ if(run.status==='running')return 'Autodiagnostica già in corso. Nessuna nuova proposta preparata.';
+ if(run.status==='failed')return 'Autodiagnostica fallita. Nessuna nuova proposta preparata.';
+ const tools=['roadmap_coverage','task_hierarchy','approved_plans','duplicate_titles','project_alerts'];
+ if(run.status!=='completed'||!run.completed_at||run.total_checks!==tools.length||!Array.isArray(checks)||checks.length!==tools.length||
+  checks.some(x=>!x||!tools.includes(x.tool)||!['pass','warning'].includes(x.verdict)||typeof x.summary!=='string'||typeof x.details!=='string')||
+  new Set(checks.map(x=>x.tool)).size!==tools.length)throw Error('Rapporto diagnostico incompleto.');
+ const warnings=checks.filter(x=>x.verdict==='warning');
+ if(run.passed!==tools.length-warnings.length||run.warnings!==warnings.length)throw Error('Conteggi diagnostici incoerenti.');
+ if(started.status==='completed'&&(started.total_checks!==run.total_checks||started.passed!==run.passed||started.warnings!==run.warnings))throw Error('Rapporto salvato diverso dal risultato iniziale.');
+ const heading=started.status==='completed'?'Ho eseguito e verificato':'Ho recuperato e verificato';
+ const base=heading+' l’autodiagnostica del progetto JARVIS: '+run.passed+'/'+run.total_checks+' controlli senza avvisi, '+warnings.length+' avvisi. Rapporto '+run.id+'. ';
+ if(!warnings.length)return base+'Nessuna proposta necessaria. Nessun codice modificato o test di correzione eseguito.';
+ const prepared=await post('/api/self-improvement/prepare',{project_id:project.id});
+ if(prepared?.status!=='ok'||prepared.source_run_id!==run.id||prepared.warnings!==warnings.length||prepared.automatic_changes!==0||
+  prepared.code_execution!==false||prepared.isolated_tests_executed!==false||prepared.rollback_executed!==false||
+  !Array.isArray(prepared.proposals)||prepared.proposals.length!==warnings.length||!Number.isInteger(prepared.generated)||
+  prepared.proposals.some(p=>!p||!validId(p.id)||!warnings.some(w=>w.tool===p.tool)||typeof p.existing!=='boolean'||typeof p.status!=='string')||
+  new Set(prepared.proposals.map(p=>p.id)).size!==warnings.length||new Set(prepared.proposals.map(p=>p.tool)).size!==warnings.length||
+  prepared.generated!==prepared.proposals.filter(p=>!p.existing).length)throw Error('Proposte non riconducibili alla diagnostica verificata. Controlla il registro: non dichiaro correzioni.');
+ const stored=await api('/api/self-improvement/proposals?project_id='+encodeURIComponent(project.id));
+ if(stored?.status!=='ok'||stored.scope!=='planning_only'||!Array.isArray(stored.proposals)||
+  !prepared.proposals.every(p=>stored.proposals.some(s=>s.id===p.id&&s.project_id===project.id&&s.source_run_id===run.id&&s.source_tool===p.tool&&s.status===p.status&&
+   ['title','diagnosis','suggested_change','test_plan','rollback_plan'].every(k=>typeof s[k]==='string'&&s[k].trim())&&['medium','high','low'].includes(s.risk))))throw Error('Salvataggio delle proposte non verificato.');
+ return base+'Proposte verificate: '+prepared.proposals.length+', di cui '+prepared.generated+' nuove. '+warnings.map(w=>w.summary).join('; ')+
+  '. Sono proposte di revisione dei dati, con piano di test e rollback; non correzioni applicate. Nessun test di correzione in sandbox, nessuna modifica al codice o alla produzione, nessuna spesa.';
+}
 async function runJarvisCoreCommand(command){
  if(command.kind==='project-diagnostic')return runProjectDiagnostic(command);
  if(command.kind==='plan-register')return runCorePlanRegistration(command);
@@ -796,41 +836,7 @@ async function runJarvisCoreCommand(command){
   return 'Richiesta di automiglioramento registrata nel Cloud. Il ciclo GitHub programmato proverà a preparare una correzione limitata al riconoscimento vocale, ripetere i test e proporre una revisione. Non posso garantire che venga trovata una modifica valida. Nessuna pubblicazione automatica.';
  }
 
- if(command.kind==='self-audit'){
-  // All evidence comes from existing protected APIs. Never infer approvals from model text.
-  // Executor and proposal preparation write only audit rows, not user project contents or code.
-  const [health,remediations]=await Promise.all([
-   api('/api/autonomy/status'),api('/api/autonomy/remediations')
-  ]);
-  if(!health||!['healthy','blocked','attention','not_run'].includes(health.status)
-     ||!Array.isArray(health.pending_approvals)||remediations?.status!=='ok'||!Array.isArray(remediations.cases))
-   throw Error('Non posso verificare l’autodiagnostica: nessuna correzione effettuata.');
-  const open=remediations.cases.filter(x=>x.state==='needs_review');
-  const overview='Autodiagnostica generale: '+(health.latest
-   ?String(health.latest.checks_passed)+' controlli superati su '+String(health.latest.checks_total)
-   :'nessuna esecuzione recente verificata')+'. '+open.length+' anomalie richiedono revisione.';
-  const project=state.availability.projects&&state.projects.find(p=>
-    p?.status==='active'&&String(p.name||'').trim().toLocaleLowerCase('it')==='jarvis');
-  if(!project)
-   return overview+' Non trovo un progetto attivo chiamato JARVIS: non ho eseguito verifiche specifiche né creato proposte. Nessun codice modificato o pubblicato.';
-  const diagnostic=await post('/api/executor/run',{project_id:project.id});
-  if(diagnostic?.status==='already_requested')
-   return overview+' La diagnostica del progetto JARVIS è già stata richiesta in questo minuto; non ho duplicato l’operazione. Controlla lo storico Executor prima di riprovare. Nessun codice modificato.';
-  if(diagnostic?.status!=='completed'||diagnostic.read_only!==true||diagnostic.automatic_fix_applied!==false
-     ||!Number.isInteger(diagnostic.total_checks)||!Number.isInteger(diagnostic.passed)||!Number.isInteger(diagnostic.warnings))
-   throw Error('Esito Executor non verificabile: nessun miglioramento autorizzato.');
-  const prepared=await post('/api/self-improvement/prepare',{project_id:project.id});
-  if(prepared?.status!=='ok'||prepared.automatic_changes!==0||!Array.isArray(prepared.proposals)
-     ||!Number.isInteger(prepared.generated))
-   throw Error('Proposte non verificabili: nessun miglioramento autorizzato.');
-  const proposalCount=prepared.proposals.length;
-  return overview+' Sul progetto JARVIS ho completato '+diagnostic.total_checks+
-    ' verifiche: '+diagnostic.passed+' superate, '+diagnostic.warnings+' avvisi. '+
-    (proposalCount?'Ho preparato '+prepared.generated+' '+(prepared.generated===1?'nuova proposta':'nuove proposte')+' ('+proposalCount+
-      ' totali, comprese quelle già presenti). Puoi esaminarle in Self-Improvement.':
-      'Nessuna anomalia specifica richiede una proposta: non invento correzioni.')+
-    ' Questo controllo riguarda struttura e dati del progetto, non una revisione automatica del codice. QA Guardian verifica il codice separatamente su GitHub. Non ho modificato né distribuito codice; serve approvazione per gli aggiornamenti importanti.';
- }
+ if(command.kind==='self-audit')return runVerifiedSelfAudit();
 
  if(command.kind==='website-clarify'){
   pendingWebsiteBrief={expiresAt:Date.now()+90000};
