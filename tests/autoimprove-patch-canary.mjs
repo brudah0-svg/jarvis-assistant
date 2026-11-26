@@ -19,7 +19,7 @@ function makeParser(html){
  const to=html.indexOf('function showSitePreviewInChat(',from);
  assert(from!==-1&&to>from);
  const parserSource=html.slice(from,to);
- return runInNewContext('let pendingVoiceAction=null;\n'+parserSource+'\nparseJarvisCoreCommand;',{}, {timeout:1000});
+ return runInNewContext('let pendingVoiceAction=null,pendingWebsiteBrief=null;\n'+parserSource+'\nparseJarvisCoreCommand;',{}, {timeout:1000});
 }
 const baseline=makeParser(original),candidate=makeParser(update.source);
 const utterances=[

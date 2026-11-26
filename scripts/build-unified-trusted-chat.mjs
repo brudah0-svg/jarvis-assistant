@@ -52,6 +52,14 @@ candidate=candidate.replace(oldLine,newLine);
 const oldReturn='return json({status:"ok",model:"@cf/meta/llama-3.1-8b-instruct-fp8",answer,read_only:true},200,origin);';
 assert.equal(candidate.split(oldReturn).length,2);
 candidate=candidate.replace(oldReturn,'return json({status:"ok",model:"@cf/meta/llama-3.1-8b-instruct-fp8",answer,read_only:true,operations_executed:false,approval_granted_by_chat:false,pending_proposals:pendingProposals},200,origin);');
+// Add a read-only planning route without modifying the pinned production snapshot.
+const corePlanner=readFileSync('cloudflare/workers/core-goal-planner.mjs','utf8').replace(/^export /gm,'');
+const plannerAnchor='if (path === "/api/plan" && method === "POST") {';
+assert.equal(candidate.split(plannerAnchor).length,2);
+candidate=corePlanner+'\n'+candidate.replace(plannerAnchor,'if(path==="/api/core-plan" && method==="POST"){const proposal=await coreGoalPlanRoute(request,env);return json(proposal.data,proposal.status,origin);}\n    '+plannerAnchor);
+const coreRegistration=readFileSync('cloudflare/workers/core-plan-registration.mjs','utf8').replace(/^export /gm,'');
+assert.equal(candidate.split(plannerAnchor).length,2);
+candidate=coreRegistration+'\n'+candidate.replace(plannerAnchor,'if(path==="/api/core-plan/register" && method==="POST"){const result=await corePlanRegistrationRoute(request,env);return json(result.data,result.status,origin);}\n    '+plannerAnchor);
 mkdirSync('dist',{recursive:true});
 writeFileSync('dist/jarvis-unified-trusted-chat.mjs',candidate);
 console.log('Unified Worker candidate SHA-256:',hash(candidate),'(build only)');

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node scripts/check-source.mjs && node scripts/check-provenance.mjs && node tests/backup-crypto.mjs && node tests/backup-worker-contract.mjs && node tests/core-v3-contract.mjs && node tests/unified-command-v4.mjs && node tests/unified-command-contract.mjs && node tests/unified-preview-contract.mjs && node tests/v4-staging-contract.mjs && node tests/release-gate-v4-contract.mjs && node tests/staging-v4-source-parity.mjs && node tests/github-pages-v4-contract.mjs && node tests/cloud-v4-reliability.mjs && node tests/cloud-v4-history.mjs && node tests/staging-v4-next-contract.mjs && node tests/staging-v4-current-ui.mjs && node tests/staging-v4-regression-offline.mjs && node tests/staging-cron-contract.mjs && node tests/offline-backup-contract.mjs && node tests/latest-snapshot-release-proof.mjs && node tests/staging-isolation-verify-fix.mjs && node tests/private-staging-verify-contract.mjs && node tests/private-staging-bridge-runtime.mjs && node tests/unified-cloud-candidate.mjs && node tests/unified-chat-truth.mjs && node tests/website-builder-contract.mjs && node tests/website-drafts-contract.mjs && node tests/site-jobs-contract.mjs && node tests/site-project-agent-contract.mjs",
+    "test": "node scripts/check-source.mjs && node scripts/check-provenance.mjs && node tests/backup-crypto.mjs && node tests/backup-worker-contract.mjs && node tests/core-v3-contract.mjs && node tests/unified-command-v4.mjs && node tests/unified-command-contract.mjs && node tests/unified-preview-contract.mjs && node tests/v4-staging-contract.mjs && node tests/release-gate-v4-contract.mjs && node tests/staging-v4-source-parity.mjs && node tests/github-pages-v4-contract.mjs && node tests/cloud-v4-reliability.mjs && node tests/cloud-v4-history.mjs && node tests/staging-v4-next-contract.mjs && node tests/staging-v4-current-ui.mjs && node tests/staging-v4-regression-offline.mjs && node tests/staging-cron-contract.mjs && node tests/offline-backup-contract.mjs && node tests/latest-snapshot-release-proof.mjs && node tests/staging-isolation-verify-fix.mjs && node tests/private-staging-verify-contract.mjs && node tests/private-staging-bridge-runtime.mjs && node tests/unified-cloud-candidate.mjs && node tests/unified-chat-truth.mjs && node tests/website-builder-contract.mjs && node tests/website-drafts-contract.mjs && node tests/site-jobs-contract.mjs && node tests/site-project-agent-contract.mjs && node tests/core-voice-isolation.mjs && node tests/core-dialogue-context.mjs && node tests/core-personal-memory.mjs && node tests/core-goal-planner.mjs && node tests/core-plan-registration.mjs && node tests/core-project-executor.mjs && node tests/core-self-audit.mjs",
     "check": "node scripts/check-source.mjs",
     "test:crypto": "node tests/backup-crypto.mjs",
     "test:backup-worker": "node tests/backup-worker-contract.mjs",
@@ -36,7 +36,14 @@
     "test:website-builder": "node tests/website-builder-contract.mjs",
     "test:site-drafts": "node tests/website-drafts-contract.mjs",
     "test:site-jobs": "node tests/site-jobs-contract.mjs",
-    "test:site-projects": "node tests/site-project-agent-contract.mjs"
+    "test:site-projects": "node tests/site-project-agent-contract.mjs",
+    "test:core-voice": "node tests/core-voice-isolation.mjs",
+    "test:core-dialogue": "node tests/core-dialogue-context.mjs",
+    "test:core-memory": "node tests/core-personal-memory.mjs",
+    "test:core-planner": "node tests/core-goal-planner.mjs",
+    "test:core-registration": "node tests/core-plan-registration.mjs",
+    "test:core-executor": "node tests/core-project-executor.mjs",
+    "test:core-self-audit": "node tests/core-self-audit.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -20,6 +20,8 @@ jobs:
           node-version: "22"
       - name: Check worker syntax and safety invariants
         run: npm test
+      - name: Verify complete CORE Worker against real isolated SQLite
+        run: node tests/core-worker-sqlite-integration.mjs
       - name: Check no private backup or local env files are tracked
         run: |
           if git ls-files | grep -Ei '(^|/)(\.dev\.vars|\.env(\.|$)|[^/]+\.(sqlite3?|db|pem|key|jarvisbak))$'; then
