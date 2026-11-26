@@ -22,6 +22,8 @@ jobs:
         run: npm test
       - name: Verify complete CORE Worker against real isolated SQLite
         run: node tests/core-worker-sqlite-integration.mjs
+      - name: Verify agenda push with isolated SQLite and synthetic provider
+        run: node tests/core-agenda-push-sqlite.mjs
       - name: Check no private backup or local env files are tracked
         run: |
           if git ls-files | grep -Ei '(^|/)(\.dev\.vars|\.env(\.|$)|[^/]+\.(sqlite3?|db|pem|key|jarvisbak))$'; then
