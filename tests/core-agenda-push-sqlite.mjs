@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {agendaPushWindow,runAgendaPushTick} from '../cloudflare/workers/core-agenda-push.mjs';
+import {execFileSync} from 'node:child_process';
+import {readFileSync} from 'node:fs';
+import {pathToFileURL} from 'node:url';
+import {resolve} from 'node:path';
+const now=new Date('2026-11-26T09:35:00Z');
+assert.equal(agendaPushWindow(now).get('2026-11-26T10:30'),'2026-11-26 09:30:00');
+assert(!agendaPushWindow(now).has('2026-11-26T10:25'));
+assert(!agendaPushWindow(new Date('2027-10-31T01:35:00Z')).has('2027-10-31T02:30'));
+const db=new DatabaseSync(':memory:');
+db.exec("CREATE TABLE tasks(id TEXT PRIMARY KEY,title TEXT,project_id TEXT,status TEXT,due_date TEXT,description TEXT); CREATE TABLE monitoring_events(id TEXT PRIMARY KEY,event_key TEXT UNIQUE,kind TEXT,severity TEXT,project_id TEXT,task_id TEXT,title TEXT,status TEXT DEFAULT 'open',detected_at TEXT DEFAULT CURRENT_TIMESTAMP,last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP); CREATE TABLE push_subscriptions(id TEXT PRIMARY KEY,endpoint TEXT,enabled INTEGER); CREATE TABLE push_auto_optins(subscription_id TEXT PRIMARY KEY,enabled INTEGER,activated_at TEXT); CREATE TABLE push_auto_deliveries(id TEXT PRIMARY KEY,event_id TEXT,subscription_id TEXT,status TEXT,attempts INTEGER,http_status INTEGER,error_type TEXT,updated_at TEXT DEFAULT CURRENT_TIMESTAMP,UNIQUE(event_id,subscription_id));");
+const DB={prepare(sql){const wrap=params=>({async first(){return db.prepare(sql).get(...params)},async all(){return{success:true,results:db.prepare(sql).all(...params)}},async run(){return{success:true,meta:{changes:Number(db.prepare(sql).run(...params).changes)}}}});return {...wrap([]),bind(...params){return wrap(params)}}}};
+const env={DB,VAPID_PRIVATE_JWK:'synthetic',VAPID_PUBLIC_KEY:'synthetic'};
+let id=0,sends=0;const uuid=()=>String(++id);
+const task=(id,time,status='pending',project=null)=>db.prepare("INSERT INTO tasks VALUES(?,?,?,?,?,?)").run(id,'Privato',project,status,'2026-11-26','JARVIS_AGENDA_V1:'+time);
+const sub=(id,enabled,at,endpoint='https://fcm.googleapis.com/fcm/send/test')=>{db.prepare("INSERT INTO push_subscriptions VALUES(?,?,1)").run(id,endpoint);db.prepare("INSERT INTO push_auto_optins VALUES(?,?,?)").run(id,enabled,at)};
+const send=async endpoint=>{assert.equal(endpoint.hostname,'fcm.googleapis.com');sends++;return {ok:true,status:201}};
+const tick=()=>runAgendaPushTick(env,now,send,uuid);
+try{
+ task('agenda-a','10:30');task('agenda-future','10:36');task('agenda-stale','10:25');task('agenda-done','10:31','done');task('agenda-project','10:31','pending','p');task('regular','10:31');
+ assert.equal((await tick()).attempted,0);
+ assert.equal(db.prepare('SELECT count(*) n FROM monitoring_events').get().n,0);
+ sub('active',1,'2026-11-26 08:00:00');sub('disabled',0,'2026-11-26 08:00:00');sub('late',1,'2026-11-26 09:32:00');sub('bad',1,'2026-11-26 08:00:00','https://example.test/');
+ const first=await tick();assert.deepEqual(first,{events:1,accepted:1,failed:0,attempted:1});assert.equal(sends,1);
+ assert.equal(db.prepare('SELECT subscription_id FROM push_auto_deliveries').get().subscription_id,'active');
+ assert.equal((await tick()).attempted,0);assert.equal(sends,1);
+ db.prepare("UPDATE push_auto_optins SET enabled=0 WHERE subscription_id='active'").run();
+ task('agenda-b','10:29');assert.equal((await tick()).attempted,0);
+ sub('gone',1,'2026-11-26 08:00:00');
+ const rejected=await runAgendaPushTick(env,now,async()=>({ok:false,status:410}),uuid);assert.equal(rejected.failed,1);
+ assert.equal(db.prepare("SELECT enabled FROM push_subscriptions WHERE id='gone'").get().enabled,0);
+ sub('uncertain',1,'2026-11-26 08:00:00');
+ const unknown=await runAgendaPushTick(env,now,async()=>{throw Error('network')},uuid);
+ assert.equal(unknown.failed,2);assert.equal((await tick()).attempted,0);
+ // Build the actual Worker and exercise the fast scheduled branch with no DB.
+ execFileSync(process.execPath,['scripts/build-website-builder-candidate.mjs'],{stdio:'inherit'});
+ const path=resolve('dist/jarvis-website-builder-candidate.mjs');
+ const source=readFileSync(path,'utf8');
+ assert(source.includes('if(controller.cron===agendaPushCron)'));
+ assert(source.includes("e.kind!='agenda_due'"));
+ assert(source.includes('!String(task.id).startsWith("agenda-")'));
+ const worker=(await import(pathToFileURL(path).href)).default;
+ await worker.scheduled({cron:'*/5 * * * *'},{AI:{run(){throw Error('Unexpected AI')}},DB:{prepare(){throw Error('Should not read without push keys')}}},{waitUntil(){throw Error('Legacy maintenance started')}});
+ console.log('PASS agenda push: real SQLite, Rome time, explicit opt-in, stale/future filtering, repeat prevention, revoked subscription, failed delivery, isolated scheduled branch.');
+}finally{db.close()}
