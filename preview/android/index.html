@@ -1,0 +1,267 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'"><title>JARVIS · Collaudo vocale isolato</title><style>:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#07111d;color:#dceeff;font:16px/1.5 system-ui,sans-serif}main{max-width:640px;margin:auto;padding:24px 16px}h1{font-size:25px;margin:0}small,p{color:#a9c1d6}.notice{border:1px solid #4a7899;border-radius:12px;padding:12px;margin:18px 0;background:#10283d}.conversation{min-height:180px;max-height:44vh;overflow:auto;background:#0b2030;border:1px solid #294d66;border-radius:14px;padding:12px;margin:15px 0}.bubble{padding:11px;margin:8px 0;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere}.jarvis{background:#15384b}.user{background:#254154;margin-left:24px}form{display:flex;gap:8px;flex-wrap:wrap}input{flex:1 1 180px;min-width:0}button,input{font:inherit;border:1px solid #487796;border-radius:10px;padding:12px;color:#e5f5ff;background:#102c40}button{cursor:pointer;min-height:48px}#dialogueBtn{width:100%;background:#15536a;margin:8px 0}#dialogueStatus{min-height:48px;color:#83d9f3}</style></head><body><main><h1>JARVIS</h1><small>CORE · Collaudo Android · 1a04b2364947</small><div class="notice"><strong>SOLO PROVA VOCALE — nessun Cloud o AI</strong><br>Stesso motore vocale e parser del CORE verificato. Risposte locali di prova, non esecuzione di lavori. Nessun salvataggio. Non pronunciare dati personali: il browser può usare il suo servizio di riconoscimento vocale.</div><button id="dialogueBtn" aria-pressed="false">🎧 Avvia dialogo</button><div id="dialogueStatus" role="status">Avvia il dialogo e prova a parlare.</div><div id="conversation" class="conversation" aria-live="polite"><div class="bubble jarvis">Sistema di collaudo pronto, signore.</div></div><form id="chatForm"><input id="chatInput" maxlength="1500" autocomplete="off" placeholder="Scrivi o parla..." aria-label="Comando"><button type="submit">Invia</button><button type="button" id="voiceBtn">🎙 Microfono</button><button type="button" id="voiceOutputBtn" aria-pressed="false">🔇 Voce OFF</button></form><p>Prova: «Jarvis, creami un sito web», poi «Per un elettricista». Durante la risposta il microfono deve fermarsi e riattivarsi dopo. Dì «termina dialogo» per concludere.</p></main><script>"use strict";
+const $=id=>document.getElementById(id);
+const STATIC_PREVIEW=false;
+let chatBusy=false;
+let voiceOutputEnabled=false;
+let dialogueActive=false,dialogueListening=false,dialogueSpeaking=false,dialoguePending=false;
+let dialogueRecognition=null,dialogueEpoch=0,dialogueErrors=0,dialogueTimer=0;
+let singleRecognition=null;
+function cancelSingleRecognition(){
+ const r=singleRecognition;singleRecognition=null;
+ if(r){r.onresult=r.onerror=r.onend=null;try{r.abort?.()}catch{}}
+}
+let pendingVoiceAction=null; // One short-lived, low-risk operation awaiting explicit spoken confirmation.
+let pendingWebsiteBrief=null; // One-turn clarification, never persisted or inferred by AI.
+let lastCorePlan=null; // Current unsaved draft; only explicit registration can create tasks.
+function dialogueStatus(message){$('dialogueStatus').textContent=message}
+function dialogueUi(){$('dialogueBtn').setAttribute('aria-pressed',String(dialogueActive));$('dialogueBtn').textContent=dialogueActive?'⏹ Termina dialogo':'🎧 Avvia dialogo'}
+function cancelDialogueRecognition(){
+ const r=dialogueRecognition;dialogueRecognition=null;dialogueListening=false;
+ if(r){r.onresult=r.onerror=r.onend=null;try{r.abort?.()}catch{}}
+}
+function stopDialogue(reason){
+ dialogueActive=false;dialogueEpoch++;clearTimeout(dialogueTimer);cancelDialogueRecognition();
+ pendingVoiceAction=null;pendingWebsiteBrief=null;dialoguePending=false;dialogueSpeaking=false;
+ try{window.speechSynthesis?.cancel()}catch{}
+ dialogueUi();dialogueStatus(reason||'Dialogo terminato.');
+}
+function resumeDialogue(){
+ clearTimeout(dialogueTimer);
+ const epoch=dialogueEpoch;
+ if(!dialogueActive||document.hidden||dialogueSpeaking||dialoguePending||chatBusy||dialogueListening)return;
+ dialogueTimer=setTimeout(()=>{if(epoch===dialogueEpoch)listenDialogue()},400);
+}
+function listenDialogue(){
+ if(!dialogueActive||document.hidden||dialogueSpeaking||dialoguePending||chatBusy||dialogueListening)return;
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){stopDialogue('Riconoscimento vocale non supportato. Usa la chat scritta.');return}
+ const r=new SR(),epoch=dialogueEpoch;
+ r.lang='it-IT';r.continuous=false;r.interimResults=false;r.maxAlternatives=1;
+ dialogueRecognition=r;dialogueListening=true;
+ r.onresult=e=>{
+  if(!dialogueActive||epoch!==dialogueEpoch||dialoguePending)return;
+  const text=String(e.results?.[0]?.[0]?.transcript||'').trim().slice(0,1500);
+  if(!text)return;
+  dialogueErrors=0;dialoguePending=true;cancelDialogueRecognition();
+  if(/^(?:stop|basta|fermati|termina (?:il )?dialogo)(?: jarvis)?[.!]?$/i.test(text)){stopDialogue('Ricevuto, signore. Dialogo terminato.');return}
+  dialogueStatus('Richiesta ricevuta. Sto elaborando…');
+  $('chatInput').value=text;$('chatForm').requestSubmit();
+ };
+ r.onerror=e=>{
+  if(!dialogueActive||epoch!==dialogueEpoch)return;
+  if(['not-allowed','service-not-allowed','audio-capture'].includes(e.error)){stopDialogue('Microfono non autorizzato o non disponibile.');return}
+  if(++dialogueErrors>=4){stopDialogue('Riconoscimento instabile. Riavvia il dialogo quando vuoi.');return}
+  dialogueStatus('Non ho capito bene. Riprovo…');
+ };
+ r.onend=()=>{
+  if(epoch!==dialogueEpoch)return;
+  if(dialogueRecognition===r)dialogueRecognition=null;
+  dialogueListening=false;
+  if(!dialoguePending)resumeDialogue();
+ };
+ try{r.start();dialogueStatus('Ti ascolto, signore…')}
+ catch(e){stopDialogue('Impossibile avviare il microfono. Verifica i permessi Android.')}
+}
+function jarvisSpeak(message){
+ if(!voiceOutputEnabled||!window.speechSynthesis||typeof SpeechSynthesisUtterance==='undefined')return;
+ try{
+  cancelSingleRecognition();
+  if(dialogueActive)cancelDialogueRecognition();
+  window.speechSynthesis.cancel();
+  const speech=new SpeechSynthesisUtterance(String(message).slice(0,950)),epoch=dialogueEpoch;
+  speech.lang='it-IT';speech.rate=0.97;speech.pitch=0.88;
+  if(dialogueActive){dialogueSpeaking=true;dialogueStatus('JARVIS risponde…')}
+  speech.onend=()=>{
+   if(!dialogueActive||epoch!==dialogueEpoch)return;
+   dialogueSpeaking=false;dialoguePending=false;resumeDialogue();
+  };
+  speech.onerror=()=>{
+   if(dialogueActive&&epoch===dialogueEpoch)stopDialogue('Riproduzione vocale interrotta. Riavvia il dialogo.');
+  };
+  window.speechSynthesis.speak(speech);
+ }catch(e){
+  voiceOutputEnabled=false;$('voiceOutputBtn').textContent='🔇 Voce non disponibile';
+  if(dialogueActive)stopDialogue('Sintesi vocale non disponibile.');
+ }
+}
+function say(text,who='jarvis'){
+ const box=document.createElement('div');box.className='bubble '+who;
+ box.textContent=String(text);$('conversation').append(box);$('conversation').scrollTop=$('conversation').scrollHeight;
+ if(who==='jarvis'&&chatBusy)jarvisSpeak(text);
+}
+$('dialogueBtn').onclick=()=>{
+ if(dialogueActive){stopDialogue('Dialogo terminato su tua richiesta.');return}
+ if(STATIC_PREVIEW){dialogueStatus('Apri JARVIS Cloud per parlare.');return}
+ if(!window.speechSynthesis||!(window.SpeechRecognition||window.webkitSpeechRecognition)){
+  dialogueStatus('Browser non compatibile. Prova Chrome Android o usa la chat scritta.');return
+ }
+ cancelSingleRecognition();
+ dialogueActive=true;dialogueErrors=0;dialoguePending=false;dialogueSpeaking=false;dialogueEpoch++;
+ voiceOutputEnabled=true;$('voiceOutputBtn').setAttribute('aria-pressed','true');$('voiceOutputBtn').textContent='🔊 Voce ON';
+ dialogueUi();jarvisSpeak('Sì, signore. Ti ascolto.');
+};
+document.addEventListener('visibilitychange',()=>{if(document.hidden){pendingVoiceAction=null;pendingWebsiteBrief=null;cancelSingleRecognition();if(dialogueActive)stopDialogue('Pagina non in primo piano: dialogo fermato. Riavvialo quando torni.')}});
+$('voiceOutputBtn').onclick=()=>{
+ if(!window.speechSynthesis){say('Sintesi vocale non supportata.');return}
+ voiceOutputEnabled=!voiceOutputEnabled;$('voiceOutputBtn').setAttribute('aria-pressed',String(voiceOutputEnabled));
+ $('voiceOutputBtn').textContent=voiceOutputEnabled?'🔊 Voce ON':'🔇 Voce OFF';
+ if(voiceOutputEnabled)jarvisSpeak('Sì, signore. Risposta vocale attivata.');
+ else{if(dialogueActive)stopDialogue('Dialogo terminato perché hai disattivato la voce.');window.speechSynthesis.cancel()}
+};
+
+function parseJarvisCoreCommand(message){
+ const input=String(message||'')
+  .replace(/^(?:e\s+)?(?:(?:ciao|salve|buongiorno|buonasera|ehi|hey)\s+)?jarvis[\s,:;.!?-]*/i,'')
+  .replace(/^(?:ciao|salve|buongiorno|buonasera)[\s,:;.!?-]+(?:ehi|hey)?\s*jarvis[\s,:;.!?-]*/i,'')
+  .trim();
+ // Confirmation applies only to the exact pending operation. A question is not consent.
+ const affirmative=/^(?:s[ìi](?:[ ,]+confermo)?|confermo|procedi)[.!]*$/i;
+ const ambiguous=/^(?:s[ìi](?:[ ,]+confermo)?|confermo|procedi|va bene)[.!?？]*$/i;
+ const negative=/^(?:no(?:[ ,]+annulla)?|annulla|lascia stare|non farlo)[.!]*$/i;
+ if(pendingVoiceAction){
+  const waiting=pendingVoiceAction;pendingVoiceAction=null;
+  if(Date.now()<=waiting.expiresAt){
+   if(affirmative.test(input))return {...waiting.command,voiceConfirmed:true};
+   if(negative.test(input))return {kind:'voice-cancel'};
+   if(ambiguous.test(input)){pendingVoiceAction=waiting;return {kind:'voice-confirm-clarify'}}
+  }else if(ambiguous.test(input)||negative.test(input))return {kind:'voice-confirm-expired'};
+ }
+ // A missing website recipient can be supplied in one immediate follow-up.
+ // Only an explicit "per <recipient>" resumes the request; unrelated turns cancel it.
+ if(pendingWebsiteBrief){
+  const waiting=pendingWebsiteBrief;pendingWebsiteBrief=null;
+  if(Date.now()<=waiting.expiresAt){
+   if(negative.test(input))return {kind:'voice-cancel'};
+   const follow=input.match(/^per\s+(.+)$/i);
+   if(follow&&!/[?？]/.test(input)){
+    const target=follow[1].replace(/[,;]?\s+(?:per\s+favore|perfavore|grazie|per\s+piacere)[.!]*$/i,'').replace(/[.!]+$/,'').trim();
+    if(target.length>=3&&target.length<=850)return {kind:'website',title:target};
+   }
+  }
+ }
+ const registerPlan=input.match(/^(?:registra|salva|aggiungi)\s+(?:il\s+)?(?:ultimo\s+)?piano\s+(?:nel|al)\s+progetto\s+(.+)$/i);
+ if(registerPlan&&!/[?？]\s*$/.test(input))return {kind:'plan-register',projectName:registerPlan[1].replace(/[.!]+$/,'').trim()};
+ const diagnostic=input.match(/^(?:esegui\s+(?:la\s+)?diagnostica\s+(?:del|sul)\s+progetto|controlla\s+(?:il\s+)?progetto)\s+(.+)$/i);
+ if(diagnostic&&!/[?？]\s*$/.test(input))return {kind:'project-diagnostic',projectName:diagnostic[1].replace(/[.!]+$/,'').trim()};
+ // Explicit memory requests are different from reminders and advisory questions.
+ const saveMemory=input.match(/^(?:ricorda(?:ti)?\s+che|memorizza(?:\s+che)?|salva\s+(?:nella|in)\s+memoria)\s*[:,-]?\s+(.+)$/i);
+ if(saveMemory&&!/[?？]\s*$/.test(input))return {kind:'memory-save',content:saveMemory[1].trim()};
+ const recallMemory=input.match(/^(?:(?:cosa\s+ricordi|cosa\s+hai\s+memorizzato)\s+(?:di\s+|su\s+|del(?:la|lo|le|li)?\s+|dei\s+|degli\s+|dell['’]|sul(?:la|lo|le|li)?\s+|sui\s+|sugli\s+|sull['’])|cerca\s+(?:nella|in)\s+memoria\s*[:,-]?\s+)(.+)$/i);
+ if(recallMemory)return {kind:'memory-recall',query:recallMemory[1].replace(/[?？.!]+$/,'').trim()};
+ if(/^(?:cosa\s+ricordi|cosa\s+hai\s+memorizzato|mostra(?:mi)?\s+i\s+(?:miei\s+)?ricordi)[.!?？]*$/i.test(input))return {kind:'memory-recall',query:''};
+ // Android recognition sometimes inserts «è» between the wake name and the command.
+ // Normalize only for the autoimprovement intent, leaving other actions unchanged.
+ const autoIntent=input.replace(/^(?:è|e)\s+(?=(?:miglior|auto[- ]?miglior))/i,'');
+ // Explicit read-only self-check: never fall back to advisory AI for this instruction.
+ if(/^(?:(?:auto[- ]?)?controllati|fai (?:un |l['’])?autocontrollo|verifica (?:il )?tuo stato|esegui (?:la )?diagnostica|controlla (?:il )?tuo sistema)[.!?]*$/i.test(input))
+  return {kind:'health-status'};
+ // Recover the most recent interrupted website job only when explicitly requested.
+ if(/^(?:(?:riprendi|recupera|riavvia|ritenta)\s+(?:(?:il|l['’])\s*)?(?:sito|lavoro|incarico)(?:\s+(?:bloccato|interrotto|dell['’]officina|per l['’]officina))?|(?:sblocca|riprendi)\s+(?:l['’])?ultimo\s+(?:sito|lavoro)(?:\s+bloccato)?)[.!?]*$/i.test(input))
+  return {kind:'site-resume'};
+ // Status and retry have distinct semantics: read-only query vs explicit bounded queue write.
+ if(/^(?:(?:mostra(?:mi)?|controlla|dimmi|verifica)\s+)?(?:lo\s+)?stato\s+(?:del\s+)?(?:tuo\s+)?(?:auto[- ]?)?miglioramento[.!?]*$/i.test(input)
+    ||/^(?:come\s+sta\s+andando|a\s+che\s+punto\s+(?:è|e|sei))\s+(?:il\s+tuo\s+)?(?:auto[- ]?)?miglioramento[.!?]*$/i.test(input))
+  return {kind:'autoimprove-status'};
+ if(!/[?？]\s*$/.test(input)&&/^(?:(?:riprova|ritenta|ripeti)\s+(?:a\s+)?(?:migliorarti|auto[- ]?migliorarti|il\s+tuo\s+(?:auto[- ]?)?miglioramento)|(?:riprendi|riavvia)\s+(?:l['’])?(?:auto[- ]?)?miglioramento)[.!?]*$/i.test(input))
+  return {kind:'autoimprove-retry'};
+ // Explicit improvement request: queue a bounded proposal task. Do NOT perform code writes here.
+ if(!/[?？]\s*$/.test(input)&&/^(?:(?:avvia|inizia|attiva)\s+(?:(?:il|l['’])\s*)?(?:processo\s+di\s+)?(?:auto[- ]?)?miglioramento|(?:auto[- ]?)?migliorati|migliora(?:ti)?(?:\s+(?:autonomamente|automaticamente|da\s+solo|il\s+tuo\s+codice|te\s+stesso))|(?:inizia|comincia)\s+a\s+(?:auto[- ]?)?migliorarti)(?:\s+(?:da\s+solo|autonomamente|automaticamente))?[.!?]*$/i.test(autoIntent))
+  return {kind:'autoimprove'};
+ // The user asks JARVIS to inspect itself; never interpret this as permission to deploy code.
+ if(!/[?？]\s*$/.test(input)&&/^(?:(?:auto)?analizzati|analizza il tuo (?:codice|sistema)|controlla come migliorarti|migliorati|valuta come migliorarti)(?:\s+e\s+(?:proponi|prepara)(?:\s+(?:dei|i))?\s+miglioramenti|\s+e\s+proponi\s+come\s+migliorarti)?[.!?]*$/i.test(input))
+  return {kind:'self-audit'};
+ // Safe, deterministic routing: never let a free-form AI answer authorize a write.
+ const multi=input.match(/^(?:crea|creami|costruisci|costruiscimi|realizza|fammi|sviluppa|preparami)\s+(?:(?:un|il)\s+)?(?:sito(?:\s+web)?\s+)?(?:multipagina|completo|a\s+(?:tre|3)\s+pagine)\s+(?:per|di)\s+(.+)$/i);
+ if(multi)return{kind:'multi-build',title:multi[1].trim()};
+ if(/^(?:apri|riapri|mostra(?:mi)?|recupera)\s+(?:(?:il\s+|l['’]\s*))?(?:mio\s+)?ultimo\s+(?:sito\s+)?multipagina[.!?]?$/i.test(input))
+  return{kind:'multi-open'};
+
+ const website=input.match(/^(?:(?:puoi|potresti)\s+)?(?:crea|creami|costruisci|costruiscimi|realizza|fammi|sviluppa|preparami)\s+(?:(?:un|il)\s+)?(?:sito\s*(?:web)?|landing\s*page)\s*(?:per\s+|[:\-]\s*|di\s+)(.+)$/i)
+  ||input.match(/^vorrei\s+che\s+mi\s+(?:creassi|facessi)\s+(?:(?:un|il)\s+)?(?:sito\s*(?:web)?|landing\s*page)\s+per\s+(.+)$/i);
+ if(website)return {kind:'website',title:website[1].trim()};
+
+ // Android speech recognition may fragment "mi crei un sito" as "micr è un sito un sito".
+ // This fallback is intentionally constrained: an imperative-like start, a website noun,
+ // and an explicit "per <recipient>" are ALL required. Informational questions stay read-only.
+ const noisyPrefix=input.match(/^(?:(?:per favore|perfavore)\s+)?(?:(?:puoi|potresti)\s+)?(?:mi\s*cre(?:i|a|eresti|i\s+)|mi\s*cr[eè]?\s*(?:è|e|é)?\s*|micr\s*(?:è|e)?\s*|crea(?:mi)?|costruisci(?:mi)?|fammi|fai|realizza|sviluppa|preparami|vorrei\s+(?:un|il)\s+sito)\b[\s,:;-]*/i);
+ if(noisyPrefix){
+  const rest=input.slice(noisyPrefix[0].length).trim();
+  const site=rest.match(/^(?:(?:un|il)\s+)?(?:sito(?:\s+web)?|sito\s+(?:un\s+)?sito(?:\s+web)?|pagina\s+web|landing\s+page)(?:\s+(?:un\s+)?sito(?:\s+web)?)?\s+(?:per|di)\s+(.+)$/i);
+  if(site){
+   const target=site[1].replace(/\s+(?:per\s+favore|perfavore|grazie|per\s+piacere)[.!?]*$/i,'').replace(/[.!?]+$/,'').trim();
+   if(target.length>=3&&target.length<=850)return {kind:'website',title:target};
+  }
+ }
+ // If the transcription clearly asks to build a website but omits a coherent
+ // recipient, ask for a better brief rather than inventing a completed action.
+ const wantsWebsite=/^(?:mi\s*cre|micr\b|crea(?:mi)?\b|costruisci(?:mi)?\b|fammi\b|realizza\b|sviluppa\b)/i.test(input)&&/\b(?:sito|pagina\s+web|landing\s+page)\b/i.test(input)
+  && !/^.{0,125}\bprogetto\b/i.test(input);
+ if(wantsWebsite)return {kind:'website-clarify'};
+
+ if(/^(?:(?:mostra(?:mi)?|elenca|controlla)\s+)?(?:i\s+)?(?:miei\s+)?(?:lavori|incarichi)(?:\s+(?:dei\s+)?siti)?[.!?]?$/i.test(input)
+   ||/^(?:a\s+che\s+punto\s+sono\s+)?(?:i\s+)?(?:miei\s+)?(?:siti\s+in\s+lavorazione)[.!?]?$/i.test(input))
+   return {kind:'site-status'};
+ if(/^(?:(?:apri|mostra(?:mi)?|riapri|recupera)\s+)(?:(?:il\s+|l['’]\s*)?(?:mio\s+)?)?(?:ultimo|più\s+recente)\s+(?:sito|lavoro|incarico)(?:\s+(?:creato|completato))?[.!?]?$/i.test(input))
+   return {kind:'site-open'};
+
+ const project=input.match(/^(?:(?:per favore|perfavore)\s+)?(?:(?:puoi|potresti)\s+)?(?:crea|creami|avvia|apri|fai|fammi|prepara|preparami|imposta|impostami|mi\s+crei|mi\s+creeresti|mi\s+fai|mi\s+prepari|vorrei\s+(?:creare|che\s+mi\s+creassi))\s+(?:(?:un|il)\s+)?(?:nuovo\s+)?progetto(?:\s+(?:per|chiamato|dal\s+nome|di|su)\s+|[\s:–-]+)(.+)$/i);
+ if(project){
+  const details=project[1].trim().replace(/[.!?]+$/,'').trim();
+  if(!details)return {kind:'project-clarify'};
+  // Store a readable project name; do not confuse a project record with an actual site.
+  const topic=details.replace(/^(?:un|una|il|la)\s+/i,'').trim();
+  const isWeb=/\b(?:sito|website|pagina web|web app)\b/i.test(topic);
+  const person=topic.match(/(?:per\s+)?(?:un\s+)?(?:sito\s+web\s+(?:di|per)\s+)?(?:un\s+)?(elettricista|officina|ristorante|parrucchiere|negozio|idraulico)\b/i);
+  let title=isWeb&&person?'Sito web per '+person[1]:topic;
+  if(title.length>160)return {kind:'project-clarify'};
+  return {kind:'project',title,description:details};
+ }
+ if(/\b(?:crea(?:mi)?|mi\s+crei|fare|fammi|vorrei\s+creare)\b.{0,80}\bprogetto\b/i.test(input))
+  return {kind:'project-clarify'};
+ const task=input.match(/^(?:aggiungi|crea|creami)\s+(?:(?:una|un)\s+)?(?:nuova\s+)?(?:attivit[àa]|task)\s*[:\-]?\s+(.+)$/i);
+ if(task)return {kind:'task',title:task[1].trim()};
+ const planning=input.match(/^(?:pianifica|prepara (?:un )?piano per|organizza)\s*[:\-]?\s+(.+)$/i);
+ if(planning)return {kind:'plan',title:planning[1].trim()};
+ return null;
+}
+
+$('voiceBtn').onclick=()=>{
+ if(dialogueActive){dialogueStatus('Il dialogo è già attivo: parla normalmente.');return}
+ if(chatBusy||document.hidden||window.speechSynthesis?.speaking||window.speechSynthesis?.pending||singleRecognition)return;
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){say('Dettatura non supportata dal browser. Usa la tastiera Android.');return}
+ if(!voiceOutputEnabled&&'speechSynthesis' in window){voiceOutputEnabled=true;$('voiceOutputBtn').textContent='🔊 Voce ON';$('voiceOutputBtn').setAttribute('aria-pressed','true')}
+ const r=new SR();singleRecognition=r;
+ r.lang='it-IT';r.continuous=false;r.interimResults=false;r.maxAlternatives=1;
+ r.onresult=e=>{
+  if(singleRecognition!==r||dialogueActive||chatBusy||document.hidden||window.speechSynthesis?.speaking||window.speechSynthesis?.pending){if(singleRecognition===r)cancelSingleRecognition();return}
+  const spoken=String(e.results?.[0]?.[0]?.transcript||'').trim().slice(0,1500);
+  if(!spoken)return;
+  cancelSingleRecognition();
+  $('chatInput').value=spoken;$('chatForm').requestSubmit();
+ };
+ r.onerror=()=>{if(singleRecognition===r){cancelSingleRecognition();say('Errore della dettatura.')}};
+ r.onend=()=>{if(singleRecognition===r)singleRecognition=null};
+ try{r.start()}catch{cancelSingleRecognition();say('Impossibile avviare il microfono. Verifica i permessi Android.')}
+};
+
+
+
+$('chatForm').onsubmit=async e=>{
+ e.preventDefault();if(chatBusy)return;
+ const input=$('chatInput'),message=input.value.trim();if(!message){dialoguePending=false;resumeDialogue();return}
+ input.value='';chatBusy=true;say(message,'user');
+ try{
+  const command=parseJarvisCoreCommand(message);
+  let answer='Ti ho sentito, signore. Questo è un collaudo vocale locale: nessun comando esterno è stato eseguito.';
+  if(command?.kind==='website-clarify'){
+   pendingWebsiteBrief={expiresAt:Date.now()+90000};
+   answer='Certamente, signore. Per chi devo creare il sito?';
+  }else if(command?.kind==='website')answer='Destinatario riconosciuto: '+command.title+'. Collaudo locale: nessun sito generato.';
+  else if(command?.kind==='voice-cancel')answer='Ricevuto, signore. Operazione annullata.';
+  else if(command?.kind)answer='Comando riconosciuto: '+command.kind+'. Nessuna operazione Cloud eseguita.';
+  say(answer);
+ }catch{say('Errore del collaudo locale. Nessuna operazione esterna.')}
+ finally{chatBusy=false;if(dialogueActive&&!dialogueSpeaking){dialoguePending=false;resumeDialogue()}}
+};
+</script></body></html>
