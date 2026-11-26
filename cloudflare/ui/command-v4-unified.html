@@ -493,15 +493,17 @@ function parseJarvisCoreCommand(message){
   }else if(ambiguous.test(input)||negative.test(input))return {kind:'voice-confirm-expired'};
  }
  // A missing website recipient can be supplied in one immediate follow-up.
- // Only an explicit "per <recipient>" resumes the request; unrelated turns cancel it.
+ // Accept explicit recipients and short, recognizable business noun phrases.
+ // Other replies cancel the pending brief instead of guessing the user's intent.
  if(pendingWebsiteBrief){
   const waiting=pendingWebsiteBrief;pendingWebsiteBrief=null;
   if(Date.now()<=waiting.expiresAt){
    if(negative.test(input))return {kind:'voice-cancel'};
    const follow=input.match(/^per\s+(.+)$/i);
-   if(follow&&!/[?？]/.test(input)){
-    const target=follow[1].replace(/[,;]?\s+(?:per\s+favore|perfavore|grazie|per\s+piacere)[.!]*$/i,'').replace(/[.!]+$/,'').trim();
-    if(target.length>=3&&target.length<=850)return {kind:'website',title:target};
+   const bare=input.match(/^((?:(?:un|uno|una|il|lo|la)\s+|un['’]|l['’])(?:elettricist[ai]|idraulic[oa]|meccanic[oa]|officina|ristorante|pizzeria|bar|negozio|parrucchier[ea]|barbiere|falegname|azienda|impresa|professionista|studio|hotel|albergo|agriturismo|dentista|estetista|pasticceria|panetteria|carrozzeria|farmacia|gelateria)(?:\s+[\p{L}\p{N}'’\-]+){0,8})(?:[,;]?\s+(?:grazie|per\s+favore|per\s+piacere))?[.!]*$/iu);
+   if((follow||bare)&&!/[?？]/.test(input)){
+    const target=(follow||bare)[1].replace(/[,;]?\s+(?:per\s+favore|perfavore|grazie|per\s+piacere)[.!]*$/i,'').replace(/[.!]+$/,'').trim();
+    if(target.length>=3&&target.length<=850&&!/^(?:favore|piacere|ora|adesso|un attimo|un momento|questo|quello|quanto|quale|ché|che)\b/i.test(target)&&!/\b(?:non|annulla|basta|aspetta|fermati|voglio|vorrei|potresti|puoi|devo|devi|costa|costerebbe|quanto|come|perché|perche|invece|oppure|o)\b/i.test(target))return {kind:'website',title:target};
    }
   }
  }
