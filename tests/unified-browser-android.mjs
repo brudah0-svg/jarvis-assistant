@@ -16,6 +16,7 @@ const tasks=[{id:'task-base',project_id:'cloud-base',title:'Attività Cloud',sta
 const memories=[{id:'memory-base',content:'Memoria Cloud',category:'Altro',created_at:'2026-11-15'}];
 const improveJobs=[];
 const proposals=[];
+const diagnosticRuns=new Map(),improvementDrafts=[];
 const savedDrafts=[];
 const siteJobs=[];
 const multipageProjects=[];
@@ -52,9 +53,11 @@ const server=createServer(async(req,res)=>{
    if(path.startsWith('/api/site-jobs/')){const found=siteJobs.find(j=>j.id===path.split('/').pop());return json(res,found?200:404,found?{status:'ok',job:found}:{error:'Not found'});}
    if(path==='/api/site-drafts')return json(res,200,{status:'ok',drafts:savedDrafts.map(({id,title,brief,style,created_at})=>({id,title,brief,style,created_at}))});
    if(path.startsWith('/api/site-drafts/')){const found=savedDrafts.find(x=>x.id===path.split('/').pop());return json(res,found?200:404,found?{status:'ok',draft:found}:{error:'Not found'});}
-   if(path==='/api/projects')return json(res,200,{projects});
-   if(path==='/api/tasks')return json(res,200,{tasks});
-   if(path==='/api/memory')return json(res,200,{memories});
+   if(path==='/api/projects')return json(res,200,{status:'ok',projects});
+   if(path==='/api/tasks')return json(res,200,{status:'ok',tasks});
+   if(path.startsWith('/api/executor/runs/')){const result=diagnosticRuns.get(path.split('/').pop());return json(res,result?200:404,result||{error:'Run missing'})}
+   if(path==='/api/self-improvement/proposals')return json(res,200,{status:'ok',scope:'planning_only',proposals:improvementDrafts.filter(p=>p.project_id===url.searchParams.get('project_id'))});
+   if(path==='/api/memory')return json(res,200,{status:'ok',memories});
    if(path==='/api/proposals')return json(res,200,{proposals});
    if(path==='/api/autonomy/status')return json(res,200,{status:'attention',latest:{checks_passed:7,checks_total:9,created_at:'2026-11-17 06:00:14',findings:[{key:'scheduled_backup_evidence',status:'attention',detail:'Latest backup scheduled result failed'},{key:'independent_backup',status:'attention',detail:'Off-account independent export not_verified'}]},pending_approvals:[],automatic_publication:false});
     if(path==='/api/autonomy/remediations')return json(res,200,{status:'ok',cases:[{state:'needs_review',title:'Synthetic QA finding'}],automatic_execution:false});
@@ -111,9 +114,20 @@ const server=createServer(async(req,res)=>{
     }
     return json(res,200,{status:'generated',format:'standalone-static-html',html,siteTitle:'Pinco Pallo',saved,draftId,requires_publication_approval:true,production_deployed:false,operations_executed:false});
   }
-  if(path==='/api/plan'&&req.method==='POST')return json(res,200,{status:'proposal',goal:body.goal,steps:[{order:1,title:'Preparare il prototipo'},{order:2,title:'Collaudare su Android'}],requires_approval:true,notice:'Bozza sintetica senza scritture'});
-  if(path==='/api/executor/run'&&req.method==='POST')return json(res,200,{status:'completed',project_id:body.project_id,total_checks:5,passed:4,warnings:1,read_only:true,automatic_fix_applied:false});
-   if(path==='/api/self-improvement/prepare'&&req.method==='POST')return json(res,200,{status:'ok',project_id:body.project_id,automatic_changes:0,generated:1,proposals:[{id:'synthetic-safe-proposal'}]});
+  if(path==='/api/core-plan'&&req.method==='POST')return json(res,200,{status:'proposal',engine:'core-ai-v1',goal:body.goal,steps:[{order:1,title:'Preparare i requisiti',check:'Requisiti documentati',depends_on:[],status:'pending'},{order:2,title:'Preparare il prototipo',check:'Prototipo verificato',depends_on:[1],status:'pending'},{order:3,title:'Collaudare su Android',check:'Esito documentato',depends_on:[2],status:'pending'}],assumptions:[],requires_approval:true,operations_executed:false,saved:false});
+  if(path==='/api/executor/run'&&req.method==='POST'){
+   const id='00000000-0000-4000-8000-'+String(++counter).padStart(12,'0');
+   const checks=['roadmap_coverage','task_hierarchy','approved_plans','duplicate_titles','project_alerts'].map((tool,i)=>({tool,verdict:i===3?'warning':'pass',summary:'Controllo '+tool,details:'Riscontro sintetico'}));
+   diagnosticRuns.set(id,{status:'ok',run:{id,project_id:body.project_id,status:'completed',total_checks:5,passed:4,warnings:1,completed_at:'2026-11-26'},checks});
+   return json(res,200,{status:'completed',run_id:id,project_id:body.project_id,total_checks:5,passed:4,warnings:1,read_only:true,automatic_fix_applied:false});
+  }
+   if(path==='/api/self-improvement/prepare'&&req.method==='POST'){
+    const evidence=[...diagnosticRuns.values()].filter(x=>x.run.project_id===body.project_id).at(-1);
+    if(!evidence)return json(res,409,{error:'No diagnostic'});
+    const id='00000000-0000-4000-8000-'+String(++counter).padStart(12,'0');
+    improvementDrafts.push({id,project_id:body.project_id,source_run_id:evidence.run.id,source_tool:'duplicate_titles',status:'draft',title:'Rivedere duplicati',diagnosis:'Duplicati',suggested_change:'Revisione',test_plan:'Verifica su copia',rollback_plan:'Ripristino copia',risk:'medium'});
+    return json(res,200,{status:'ok',source_run_id:evidence.run.id,warnings:1,automatic_changes:0,code_execution:false,isolated_tests_executed:false,rollback_executed:false,generated:1,proposals:[{id,tool:'duplicate_titles',status:'draft',existing:false}]});
+   }
    if(path==='/api/autoimprove/retry'&&req.method==='POST'){
      const previous=improveJobs.find(x=>x.id===body.job_id);
      if(!previous||!['no_change','failed'].includes(previous.status))return json(res,409,{error:'Only failed completed jobs'});
@@ -271,8 +285,8 @@ try{
  const beforePlanWrites=writes.filter(w=>w.path==='/api/projects'||w.path==='/api/tasks').length;
  await page.locator('#chatInput').fill('Pianifica: costruire il mio assistente AI');
  await page.locator('#chatForm button[type=submit]').click();
- await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Bozza operativa per'),{timeout:15000});
- assert(writes.some(w=>w.path==='/api/plan'&&w.body.goal==='costruire il mio assistente AI'),'Planning must use existing same-origin API');
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Bozza AI per'),{timeout:15000});
+ assert(writes.some(w=>w.path==='/api/core-plan'&&w.body.goal==='costruire il mio assistente AI'),'Planning must use existing same-origin API');
  assert.equal(writes.filter(w=>w.path==='/api/projects'||w.path==='/api/tasks').length,beforePlanWrites,'Planning cannot write projects or tasks');
  assert.equal(proposals.length,0);
 
@@ -506,7 +520,7 @@ try{
  const tasksBeforeAudit=tasks.length,projectsBeforeAudit=projects.length;
  await page.locator('#chatInput').fill('Hey Jarvis, analizzati e proponi come migliorarti');
  await page.locator('#chatForm button[type=submit]').click();
- await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Ho preparato 1 nuova proposta'),{timeout:15000});
+ await page.waitForFunction(()=>document.querySelector('#conversation')?.textContent?.includes('Proposte verificate: 1, di cui 1 nuove'),{timeout:15000});
  assert.equal(writes.filter(w=>w.path==='/api/executor/run').length,1,'Self audit must execute only one diagnostic');
  assert.equal(writes.filter(w=>w.path==='/api/self-improvement/prepare').length,1,'Self audit must prepare reviewed proposals');
  assert.equal(writes.filter(w=>w.path==='/api/ai-chat').length,aiBeforeAudit,'Self audit cannot be fabricated by an advisory AI response');
