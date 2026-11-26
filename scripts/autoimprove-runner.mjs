@@ -66,7 +66,7 @@ function makeParser(html,vm){
  const start=html.indexOf('function parseJarvisCoreCommand(message){');
  const end=html.indexOf('function showSitePreviewInChat(',start);
  if(start<0||end<=start)throw Error('Parser source boundaries missing');
- return vm('let pendingVoiceAction=null;\n'+html.slice(start,end)+'\nparseJarvisCoreCommand;',{}, {timeout:1000});
+ return vm('let pendingVoiceAction=null,pendingWebsiteBrief=null;\n'+html.slice(start,end)+'\nparseJarvisCoreCommand;',{}, {timeout:1000});
 }
 export function verifyBehaviorChange(before,after){
  const a=makeParser(before,runInNewContext),b=makeParser(after,runInNewContext);
