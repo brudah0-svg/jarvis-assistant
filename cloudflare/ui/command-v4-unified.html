@@ -507,6 +507,8 @@ function parseJarvisCoreCommand(message){
  }
  const registerPlan=input.match(/^(?:registra|salva|aggiungi)\s+(?:il\s+)?(?:ultimo\s+)?piano\s+(?:nel|al)\s+progetto\s+(.+)$/i);
  if(registerPlan&&!/[?？]\s*$/.test(input))return {kind:'plan-register',projectName:registerPlan[1].replace(/[.!]+$/,'').trim()};
+ const diagnostic=input.match(/^(?:esegui\s+(?:la\s+)?diagnostica\s+(?:del|sul)\s+progetto|controlla\s+(?:il\s+)?progetto)\s+(.+)$/i);
+ if(diagnostic&&!/[?？]\s*$/.test(input))return {kind:'project-diagnostic',projectName:diagnostic[1].replace(/[.!]+$/,'').trim()};
  // Explicit memory requests are different from reminders and advisory questions.
  const saveMemory=input.match(/^(?:ricorda(?:ti)?\s+che|memorizza(?:\s+che)?|salva\s+(?:nella|in)\s+memoria)\s*[:,-]?\s+(.+)$/i);
  if(saveMemory&&!/[?？]\s*$/.test(input))return {kind:'memory-save',content:saveMemory[1].trim()};
@@ -688,7 +690,39 @@ async function runCorePlanRegistration(command){
  pendingVoiceAction={command:{kind:'plan-register',registration},expiresAt:Math.min(plan.expiresAt,Date.now()+90000)};
  return 'Vuoi registrare '+plan.steps.length+' attività da svolgere nel progetto «'+p.name+'» per l’obiettivo «'+plan.goal+'»? Rispondi «Sì, confermo» o «No, annulla». Nessuna attività ancora registrata.';
 }
+// Reuse the existing executor. A live result is only reported after a persisted
+// run and its five findings have been independently read back from the Cloud.
+async function runProjectDiagnostic(command){
+ const result=await api('/api/projects');
+ if(result?.status!=='ok'||!Array.isArray(result.projects))throw Error('Elenco progetti non verificabile.');
+ const key=s=>String(s||'').trim().toLocaleLowerCase('it');
+ const matches=result.projects.filter(p=>p&&p.status==='active'&&key(p.name)===key(command.projectName)&&typeof p.id==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(p.id));
+ if(matches.length!==1)return 'Non trovo un unico progetto attivo con questo nome. Nessun controllo avviato.';
+ const project=matches[0];
+ const start=await post('/api/executor/run',{project_id:project.id});
+ if(!start||!['completed','already_requested'].includes(start.status)||typeof start.run_id!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(start.run_id))throw Error('Avvio della diagnostica non verificabile.');
+ if(start.status==='completed'&&(start.project_id!==project.id||start.read_only!==true||start.automatic_fix_applied!==false))throw Error('Esito iniziale della diagnostica non verificabile.');
+ const report=await api('/api/executor/runs/'+encodeURIComponent(start.run_id));
+ const run=report?.run;
+ if(report?.status!=='ok'||run?.id!==start.run_id||run.project_id!==project.id)throw Error('Rapporto della diagnostica non verificabile.');
+ if(run.status==='running')return 'La diagnostica del progetto «'+project.name+'» è già in corso. Nessun risultato finale ancora verificato. Ripeti il controllo tra poco.';
+ if(run.status==='failed')return 'La diagnostica del progetto «'+project.name+'» risulta fallita nel registro. Nessuna correzione applicata.';
+ const tools=['roadmap_coverage','task_hierarchy','approved_plans','duplicate_titles','project_alerts'];
+ const checks=report.checks;
+ if(run.status!=='completed'||!run.completed_at||!Array.isArray(checks)||checks.length!==tools.length||run.total_checks!==tools.length||
+  checks.some(x=>!x||!tools.includes(x.tool)||!['pass','warning'].includes(x.verdict)||typeof x.summary!=='string'||!x.summary.trim()||typeof x.details!=='string')||
+  new Set(checks.map(x=>x.tool)).size!==tools.length)throw Error('Rapporto finale incompleto o incoerente.');
+ const warnings=checks.filter(x=>x.verdict==='warning');
+ if(run.passed!==checks.length-warnings.length||run.warnings!==warnings.length)throw Error('Conteggi della diagnostica incoerenti.');
+ if(start.status==='completed'&&(start.total_checks!==run.total_checks||start.passed!==run.passed||start.warnings!==run.warnings))throw Error('Esito iniziale e rapporto salvato non coincidono.');
+ const heading=start.status==='already_requested'?'Ho recuperato la diagnostica già richiesta':'Ho eseguito e verificato la diagnostica';
+ const findings=warnings.map(x=>'• '+x.summary.slice(0,180)+': '+x.details.slice(0,250)).join('\n');
+ return heading+' del progetto «'+project.name+'», signore. '+run.passed+'/'+run.total_checks+' controlli senza avvisi; '+run.warnings+' avvisi. ID rapporto: '+run.id+'.'+
+  (warnings.length?'\n'+findings+'\nProssimo passo: esamina gli avvisi prima di modificare il progetto.':'\nNessuna anomalia nei cinque controlli effettuati.')+
+  '\nHo verificato il registro dei controlli. Nessuna correzione automatica, nessuna azione esterna, nessuna spesa.';
+}
 async function runJarvisCoreCommand(command){
+ if(command.kind==='project-diagnostic')return runProjectDiagnostic(command);
  if(command.kind==='plan-register')return runCorePlanRegistration(command);
  if(command.kind==='memory-save'||command.kind==='memory-recall')return runPersonalMemoryCommand(command);
  if(command.kind==='voice-cancel')return 'Ricevuto, signore. Operazione annullata: nessuna modifica al Cloud.';
