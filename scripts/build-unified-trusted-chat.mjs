@@ -63,6 +63,17 @@ candidate=coreRegistration+'\n'+candidate.replace(plannerAnchor,'if(path==="/api
 const agenda=readFileSync('cloudflare/workers/core-agenda.mjs','utf8').replace(/^export /gm,'');
 assert.equal(candidate.split(plannerAnchor).length,2);
 candidate=agenda+'\n'+candidate.replace(plannerAnchor,'if(path==="/api/core-agenda" && method==="POST"){const result=await coreAgendaRoute(request,env);return json(result.data,result.status,origin);}\n    '+plannerAnchor);
+// The five-minute cron is deliberately isolated from the six-hour maintenance cycle.
+const agendaPush=readFileSync('cloudflare/workers/core-agenda-push.mjs','utf8').replace(/^export /gm,'');
+const scheduledAnchor='async scheduled(controller,env,ctx){';
+assert.equal(candidate.split(scheduledAnchor).length,2);
+candidate=agendaPush+'\n'+candidate.replace(scheduledAnchor,scheduledAnchor+'\n    if(controller.cron===agendaPushCron){await runAgendaPushTick(env).catch(e=>console.error("Agenda push tick failed",String(e?.name||"Error")));return;}\n');
+const oldOverdue='if(task.due_date&&/^\\d{4}-\\d{2}-\\d{2}$/.test(task.due_date)&&task.due_date<today)events.push';
+assert.equal(candidate.split(oldOverdue).length,2);
+candidate=candidate.replace(oldOverdue,'if(!String(task.id).startsWith("agenda-")&&task.due_date&&/^\\d{4}-\\d{2}-\\d{2}$/.test(task.due_date)&&task.due_date<today)events.push');
+const legacyPush="WHERE e.status='open' AND s.enabled=1 AND o.enabled=1 AND e.detected_at>o.activated_at";
+assert.equal(candidate.split(legacyPush).length,2);
+candidate=candidate.replace(legacyPush,"WHERE e.status='open' AND e.kind!='agenda_due' AND s.enabled=1 AND o.enabled=1 AND e.detected_at>o.activated_at");
 mkdirSync('dist',{recursive:true});
 writeFileSync('dist/jarvis-unified-trusted-chat.mjs',candidate);
 console.log('Unified Worker candidate SHA-256:',hash(candidate),'(build only)');
