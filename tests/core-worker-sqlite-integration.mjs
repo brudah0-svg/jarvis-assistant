@@ -12,10 +12,10 @@ const path=resolve('dist/jarvis-website-builder-candidate.mjs');
 execFileSync(process.execPath,['--check',path],{stdio:'inherit'});
 const worker=(await import(pathToFileURL(path).href)).default;
 const db=new DatabaseSync(':memory:');
-db.exec("PRAGMA foreign_keys=ON; CREATE TABLE projects(id TEXT PRIMARY KEY,status TEXT NOT NULL); CREATE TABLE tasks(id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES projects(id),title TEXT NOT NULL,description TEXT NOT NULL,status TEXT NOT NULL); INSERT INTO projects VALUES('alpha','active'),('inactive','archived'),('beta','active');");
+db.exec("PRAGMA foreign_keys=ON; CREATE TABLE projects(id TEXT PRIMARY KEY,status TEXT NOT NULL); CREATE TABLE tasks(id TEXT PRIMARY KEY,project_id TEXT REFERENCES projects(id),title TEXT NOT NULL,description TEXT NOT NULL,status TEXT NOT NULL,due_date TEXT); INSERT INTO projects VALUES('alpha','active'),('inactive','archived'),('beta','active');");
 let batches=0,aiCalls=0;
 const DB={
- prepare(sql){return{bind(...params){return{sql,params}}}},
+ prepare(sql){return{bind(...params){return{sql,params,async all(){return{success:true,results:db.prepare(sql).all(...params)}}}}}},
  async batch(statements){
   batches++;db.exec('BEGIN IMMEDIATE');
   try{const results=statements.map(({sql,params})=>{
@@ -67,5 +67,20 @@ try{
  assert.equal(differentProject.status,409);assert.equal(count(),3);
  const noAI=await request('/api/core-plan',{goal},{DB});
  assert.equal(noAI.status,503);assert.equal(aiCalls,1);assert.equal(count(),3);
- console.log('PASS: complete Worker UI, planner route, real SQLite registration, retry, conflict, inactive project, token integrity and unavailable AI. No production actions.');
+ // Real SQLite agenda test: only internal rows, never model calls or push.
+ const message='Ricordami di chiamare Marco domani alle 10:30';
+ const agenda=await request('/api/core-agenda',{action:'preview',message},{DB});
+ assert.equal(agenda.status,200);assert.equal(agenda.data.entry.title,'chiamare Marco');assert.equal(agenda.data.entry.time,'10:30');assert.equal(count(),3);
+ const expected=agenda.data.entry;
+ const deniedAgenda=await request('/api/core-agenda',{action:'save',message,expected,confirmed:false},{DB});
+ assert.equal(deniedAgenda.status,400);assert.equal(count(),3);
+ const draftAgenda={action:'save',message,expected,confirmed:true};
+ const savedAgenda=await request('/api/core-agenda',draftAgenda,{DB});
+ assert.equal(savedAgenda.status,200);assert.equal(savedAgenda.data.created,true);assert.equal(savedAgenda.data.push_scheduled,false);assert.equal(count(),4);
+ const agendaRow=db.prepare("SELECT * FROM tasks WHERE id=?").get(savedAgenda.data.entry.id);
+ assert.equal(agendaRow.project_id,null);assert.equal(agendaRow.due_date,expected.date);assert.equal(agendaRow.description,'JARVIS_AGENDA_V1:10:30');
+ const replayAgenda=await request('/api/core-agenda',draftAgenda,{DB});assert.equal(replayAgenda.status,200);assert.equal(replayAgenda.data.created,false);assert.equal(count(),4);
+ const listAgenda=await request('/api/core-agenda',{action:'list',period:'tomorrow'},{DB});assert.equal(listAgenda.status,200);assert.equal(listAgenda.data.entries.length,1);assert.equal(listAgenda.data.entries[0].id,agendaRow.id);
+ assert.equal(aiCalls,1);
+ console.log('PASS: complete Worker, real SQLite plan and agenda registration, confirmation, retry, list, conflict, unavailable AI; no production actions.');
 }finally{db.close()}
