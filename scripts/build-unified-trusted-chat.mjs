@@ -60,6 +60,9 @@ candidate=corePlanner+'\n'+candidate.replace(plannerAnchor,'if(path==="/api/core
 const coreRegistration=readFileSync('cloudflare/workers/core-plan-registration.mjs','utf8').replace(/^export /gm,'');
 assert.equal(candidate.split(plannerAnchor).length,2);
 candidate=coreRegistration+'\n'+candidate.replace(plannerAnchor,'if(path==="/api/core-plan/register" && method==="POST"){const result=await corePlanRegistrationRoute(request,env);return json(result.data,result.status,origin);}\n    '+plannerAnchor);
+const agenda=readFileSync('cloudflare/workers/core-agenda.mjs','utf8').replace(/^export /gm,'');
+assert.equal(candidate.split(plannerAnchor).length,2);
+candidate=agenda+'\n'+candidate.replace(plannerAnchor,'if(path==="/api/core-agenda" && method==="POST"){const result=await coreAgendaRoute(request,env);return json(result.data,result.status,origin);}\n    '+plannerAnchor);
 mkdirSync('dist',{recursive:true});
 writeFileSync('dist/jarvis-unified-trusted-chat.mjs',candidate);
 console.log('Unified Worker candidate SHA-256:',hash(candidate),'(build only)');

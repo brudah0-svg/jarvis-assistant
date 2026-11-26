@@ -12,7 +12,7 @@ async function runMemoryRegression(html){
  const {parse,run}=first;
  check('explicit voice save recognized',parse('Jarvis, ricordati che preferisco il tè')?.kind==='memory-save');
  check('question does not authorize save',!parse('Ricorda che preferisco il tè?'));
- check('reminder not mistaken for memory',!parse('Ricordami domani di chiamare Marco'));
+ check('reminder routed to agenda, never memory',parse('Ricordami domani di chiamare Marco')?.kind==='agenda-save');
  check('ordinary statement does not save',!parse('Preferisco il tè'));
  check('explicit memory read recognized',parse('Cosa ricordi sul tè?')?.query==='tè'&&parse('Cosa ricordi su tè?')?.kind==='memory-recall');
  check('initial save confirmed by server', (await run(parse('Ricorda che preferisco il tè'))).includes('Memoria salvata')&&writes===1);
