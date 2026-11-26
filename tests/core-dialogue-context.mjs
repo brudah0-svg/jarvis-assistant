@@ -17,6 +17,17 @@ function runContextRegression(html){
  check('incomplete site request is recognized',parse('Jarvis, creami un sito')?.kind==='website-clarify');
  brief();const resolved=parse('Per un idraulico, grazie.');check('short follow-up resumes website request',resolved?.kind==='website'&&resolved.title==='un idraulico');
  check('website clarification consumed once',!parse('Per un negozio'));
+ brief();check('physical Android transcript recognized',parse('un elettricista')?.title==='un elettricista');
+ check('bare recipient consumed once',!parse('un elettricista'));
+ brief();check('bare female business recipient recognized',parse("un'officina")?.title==="un'officina");
+ brief();check('business with location recognized',parse('una pizzeria a Padova')?.title==='una pizzeria a Padova');
+ brief();check('bare question does not execute',!parse('un elettricista?'));
+ brief();check('wait request does not execute',!parse('un attimo'));
+ brief();check('unrelated request does not execute',!parse('un elettricista non va bene'));
+ brief();check('unrelated command remains independent',parse('Crea un progetto Alfa')?.kind==='project');
+ brief();now+=90001;check('expired bare reply cannot execute',!parse('un elettricista'));
+ brief();check('politeness is not a recipient',!parse('per favore'));
+
  brief();check('site question is not an order',!parse('Per un idraulico?'));
  check('question clears website context',!parse('Per un negozio'));
  brief();parse('Come va?');check('unrelated question clears website context',!parse('Per un idraulico'));
